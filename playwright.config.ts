@@ -10,6 +10,10 @@ export default defineConfig({
     headless: true,
     reducedMotion: "reduce",
   },
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    { name: "firefox", use: { browserName: "firefox" } },
+  ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 8890",
     url: "http://127.0.0.1:8890",

@@ -1,18 +1,23 @@
 import type {
   AuditDone,
-  SanitizeStage,
+  AuditRequest,
+  AuditVideoRequest,
+  ImageSuccess,
+  SanitizeRequest,
+  Stage,
+  VideoSanitizeRequest,
+  VideoSuccess,
   WarmDone,
   WorkerMessage,
-  WorkerRequest,
   WorkerSuccess,
 } from "./types";
+
+type ProgressFn = (stage: Stage, pct: number, detail?: string, etaS?: number) => void;
 
 type Pending =
   | { kind: "sanitize"; resolve: (v: WorkerSuccess) => void; reject: (e: Error) => void; onProgress?: ProgressFn }
   | { kind: "audit"; resolve: (v: AuditDone) => void; reject: (e: Error) => void }
   | { kind: "warm"; resolve: (v: WarmDone) => void; reject: (e: Error) => void };
-
-type ProgressFn = (stage: SanitizeStage, pct: number) => void;
 
 export class SanitizeClient {
   private worker: Worker;
@@ -28,35 +33,54 @@ export class SanitizeClient {
     );
   }
 
-  sanitize(
-    req: Omit<Extract<WorkerRequest, { kind: "sanitize" }>, "requestId" | "kind">,
-    onProgress?: ProgressFn,
-  ): Promise<WorkerSuccess> {
+  sanitize(req: Omit<SanitizeRequest, "requestId" | "kind">, onProgress?: ProgressFn): Promise<ImageSuccess> {
     const requestId = ++this.nextId;
-    const full: Extract<WorkerRequest, { kind: "sanitize" }> = {
-      ...req,
-      kind: "sanitize",
-      requestId,
-    };
+    const full: SanitizeRequest = { ...req, kind: "sanitize", requestId };
     return new Promise<WorkerSuccess>((resolve, reject) => {
       this.pending.set(requestId, { kind: "sanitize", resolve, reject, onProgress });
       this.worker.postMessage(full, [full.inputBuffer]);
+    }).then((res) => {
+      if (res.media !== "image") throw new Error("Unexpected video result.");
+      return res;
     });
   }
 
-  audit(
-    req: Omit<Extract<WorkerRequest, { kind: "audit" }>, "requestId" | "kind">,
-  ): Promise<AuditDone> {
+  sanitizeVideo(
+    req: Omit<VideoSanitizeRequest, "requestId" | "kind">,
+    onProgress?: ProgressFn,
+  ): { requestId: number; result: Promise<VideoSuccess> } {
     const requestId = ++this.nextId;
-    const full: Extract<WorkerRequest, { kind: "audit" }> = {
-      ...req,
-      kind: "audit",
-      requestId,
-    };
+    const full: VideoSanitizeRequest = { ...req, kind: "sanitize-video", requestId };
+    const result = new Promise<WorkerSuccess>((resolve, reject) => {
+      this.pending.set(requestId, { kind: "sanitize", resolve, reject, onProgress });
+      this.worker.postMessage(full);
+    }).then((res) => {
+      if (res.media !== "video") throw new Error("Unexpected image result.");
+      return res;
+    });
+    return { requestId, result };
+  }
+
+  audit(req: Omit<AuditRequest, "requestId" | "kind">): Promise<AuditDone> {
+    const requestId = ++this.nextId;
+    const full: AuditRequest = { ...req, kind: "audit", requestId };
     return new Promise<AuditDone>((resolve, reject) => {
       this.pending.set(requestId, { kind: "audit", resolve, reject });
       this.worker.postMessage(full, [full.inputBuffer]);
     });
+  }
+
+  auditVideo(file: File): Promise<AuditDone> {
+    const requestId = ++this.nextId;
+    const full: AuditVideoRequest = { kind: "audit-video", requestId, file };
+    return new Promise<AuditDone>((resolve, reject) => {
+      this.pending.set(requestId, { kind: "audit", resolve, reject });
+      this.worker.postMessage(full);
+    });
+  }
+
+  cancel(requestId: number): void {
+    this.worker.postMessage({ kind: "cancel", requestId });
   }
 
   warm(): Promise<WarmDone> {
@@ -70,7 +94,7 @@ export class SanitizeClient {
   private onMessage(msg: WorkerMessage): void {
     if (msg.type === "progress") {
       const p = this.pending.get(msg.requestId);
-      if (p?.kind === "sanitize") p.onProgress?.(msg.stage, msg.pct);
+      if (p?.kind === "sanitize") p.onProgress?.(msg.stage, msg.pct, msg.detail, msg.etaS);
       return;
     }
 
@@ -88,9 +112,8 @@ export class SanitizeClient {
       return;
     }
 
-    if (p.kind !== "sanitize") return;
     if (msg.ok) {
-      p.resolve(msg);
+      if (p.kind === "sanitize") p.resolve(msg);
     } else {
       p.reject(new Error(msg.error));
     }

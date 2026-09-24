@@ -1,6 +1,8 @@
-import type { AuditSummary } from "../sanitizer/formats";
+import type { AuditSummary, MediaKind } from "../sanitizer/formats";
+import type { VideoEngine } from "../sanitizer/types";
 import { ICON } from "./icons";
 import { formatBytes } from "./format";
+import { formatDuration } from "./preview";
 
 type VerdictStats = {
   inBytes: number;
@@ -9,7 +11,15 @@ type VerdictStats = {
   height: number;
   origWidth: number;
   origHeight: number;
+  media?: MediaKind;
+  engine?: VideoEngine;
+  audioKept?: boolean;
+  durationS?: number;
+  note?: string;
 };
+
+const VIDEO_LIMITS =
+  "Invisible watermarks such as Google SynthID, the camera's own noise pattern, and anything the video shows or says can still be in there.";
 
 export function renderVerdict(
   verdict: HTMLElement,
@@ -35,24 +45,42 @@ export function renderVerdict(
 
   const sub = document.createElement("p");
   if (ok && stats) {
-    const delta =
-      stats.inBytes > 0
-        ? Math.round(((stats.outBytes - stats.inBytes) / stats.inBytes) * 100)
-        : 0;
+    const delta = stats.inBytes > 0 ? Math.round(((stats.outBytes - stats.inBytes) / stats.inBytes) * 100) : 0;
     const sign = delta > 0 ? "+" : "";
-    const resized =
-      stats.origWidth !== stats.width || stats.origHeight !== stats.height;
+    const resized = stats.origWidth !== stats.width || stats.origHeight !== stats.height;
     const dims = resized
       ? `${stats.origWidth}×${stats.origHeight} → ${stats.width}×${stats.height}`
       : `${stats.width}×${stats.height}`;
-    sub.textContent =
-      `Metadata removed and output re-verified. ${dims} · ` +
-      `${formatBytes(stats.inBytes)} → ${formatBytes(stats.outBytes)} (${sign}${delta}%).`;
+    const size = `${formatBytes(stats.inBytes)} → ${formatBytes(stats.outBytes)} (${sign}${delta}%)`;
+    if (stats.media === "video") {
+      const lead =
+        stats.engine === "reencode"
+          ? "Decoded to raw frames and re-encoded, metadata removed, output re-verified."
+          : "Metadata removed and container rebuilt. Picture and sound untouched.";
+      const dur = stats.durationS ? ` · ${formatDuration(stats.durationS)}` : "";
+      const sound = stats.audioKept
+        ? stats.engine === "reencode"
+          ? " Sound re-encoded, not scrubbed."
+          : " Sound kept."
+        : " Sound removed.";
+      sub.textContent = `${lead} ${dims}${dur} · ${size}.${sound}${stats.note ? ` ${stats.note}` : ""}`;
+    } else {
+      sub.textContent = `Metadata removed and output re-verified. ${dims} · ${size}.`;
+    }
   } else {
-    sub.textContent =
-      error || "The output did not pass the strict audit, so download was blocked.";
+    sub.textContent = error || "The output did not pass the strict audit, so download was blocked.";
   }
   body.appendChild(sub);
+
+  if (ok && stats?.media === "video") {
+    const limits = document.createElement("p");
+    limits.className = "verdict-limits";
+    limits.textContent =
+      stats.engine === "reencode"
+        ? `${VIDEO_LIMITS} Re-encoding reduces what hidden patterns can survive. It is not a guarantee.`
+        : VIDEO_LIMITS;
+    body.appendChild(limits);
+  }
 
   verdict.appendChild(icon);
   verdict.appendChild(body);
@@ -63,13 +91,14 @@ export function renderDownload(
   url: string,
   name: string,
   bytes: number,
+  media: MediaKind = "image",
 ): void {
   downloadArea.innerHTML = "";
   const a = document.createElement("a");
   a.className = "download-btn";
   a.href = url;
   a.download = name;
-  a.innerHTML = `${ICON.download}<span class="dl-text">Download clean image<small>${name} · ${formatBytes(bytes)}</small></span>`;
+  a.innerHTML = `${ICON.download}<span class="dl-text">Download clean ${media}<small>${name} · ${formatBytes(bytes)}</small></span>`;
   downloadArea.appendChild(a);
 }
 
@@ -107,21 +136,48 @@ export function renderScanCard(
 
   const meta = document.createElement("p");
   meta.className = "scan-meta";
-  meta.textContent = `${summary.kind.toUpperCase()} · ${formatBytes(summary.byteLength)}`;
+  meta.textContent = `${summary.kind.toUpperCase()} · ${formatBytes(summary.byteLength)}${summary.tracks?.length ? ` · ${summary.tracks.join(" · ")}` : ""}`;
   container.appendChild(meta);
 
-  const uniqueMarkers = [...new Set(summary.markers)];
-  if (uniqueMarkers.length) {
-    const chips = document.createElement("div");
-    chips.className = "chips";
-    for (const marker of uniqueMarkers) {
-      const flagged = summary.issues.some((issue) => issue.includes(marker));
-      const chip = document.createElement("span");
-      chip.className = `chip${flagged ? " chip-flag" : ""}`;
-      chip.textContent = marker.trim() || marker;
-      chips.appendChild(chip);
+  const groups = summary.groups
+    ? Object.entries(summary.groups).filter(([, items]) => items.length)
+    : [];
+  if (groups.length) {
+    const wrap = document.createElement("div");
+    wrap.className = "scan-groups";
+    for (const [group, items] of groups) {
+      const row = document.createElement("div");
+      row.className = "scan-group";
+      const name = document.createElement("span");
+      name.className = "group-label";
+      name.textContent = group;
+      row.appendChild(name);
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      for (const item of [...new Set(items)]) {
+        const chip = document.createElement("span");
+        chip.className = "chip chip-flag";
+        chip.textContent = item;
+        chips.appendChild(chip);
+      }
+      row.appendChild(chips);
+      wrap.appendChild(row);
     }
-    container.appendChild(chips);
+    container.appendChild(wrap);
+  } else {
+    const uniqueMarkers = [...new Set(summary.markers)];
+    if (uniqueMarkers.length) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      for (const marker of uniqueMarkers) {
+        const flagged = summary.issues.some((issue) => issue.includes(marker));
+        const chip = document.createElement("span");
+        chip.className = `chip${flagged ? " chip-flag" : ""}`;
+        chip.textContent = marker.trim() || marker;
+        chips.appendChild(chip);
+      }
+      container.appendChild(chips);
+    }
   }
 
   if (summary.issues.length) {

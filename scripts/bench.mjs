@@ -1,5 +1,6 @@
-import { chromium } from "@playwright/test";
-import { mkdirSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
+import { chromium, firefox } from "@playwright/test";
+import { mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 const BASE = process.env.URL || "http://127.0.0.1:8890";
@@ -76,8 +77,9 @@ await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForFunction(() => typeof window.__sanitizeBench === "function", { timeout: 15000 });
 
 const RESIZES = [100, 50];
+const IMAGES = process.env.BENCH_IMAGES !== "0";
 const rows = [];
-for (const size of SIZES) {
+for (const size of IMAGES ? SIZES : []) {
   for (const f of FORMATS) {
     for (const resizePct of RESIZES) {
       const cell = await benchCell(page, size, f.mime, resizePct, N, WARMUP);
@@ -106,6 +108,85 @@ for (const size of SIZES) {
 
 await browser.close();
 
+const VIDEO = process.env.BENCH_VIDEO === "1";
+const VIDEO_ENGINES = (process.env.BENCH_ENGINES || "chromium,firefox").split(",");
+const VIDEO_N = Number(process.env.BENCH_VIDEO_N || 3);
+const VIDEO_WARMUP = Number(process.env.BENCH_VIDEO_WARMUP || 1);
+const videoRows = [];
+
+if (VIDEO) {
+  mkdirSync("test-results", { recursive: true });
+  const clip = join("test-results", "bench_1080p.mp4");
+  if (!existsSync(clip)) {
+    execFileSync("ffmpeg", [
+      "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30:duration=20",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-an", clip,
+    ]);
+  }
+  const clipBytes = readFileSync(clip);
+  for (const engineName of VIDEO_ENGINES) {
+    const launcher = engineName === "firefox" ? firefox : chromium;
+    const b = await launcher.launch();
+    const p = await b.newPage();
+    await p.goto(BASE, { waitUntil: "networkidle" });
+    await p.waitForFunction(() => typeof window.__sanitizeVideoBench === "function", { timeout: 15000 });
+    await p.evaluate(() => {
+      window.__benchChunks = [];
+    });
+    const CHUNK = 4 * 1024 * 1024;
+    for (let off = 0; off < clipBytes.length; off += CHUNK) {
+      const b64 = clipBytes.subarray(off, off + CHUNK).toString("base64");
+      await p.evaluate((b64) => {
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        window.__benchChunks.push(arr);
+      }, b64);
+    }
+    for (const engine of ["remux", "reencode"]) {
+      for (const resizePct of [100, 50]) {
+        if (engine === "remux" && resizePct !== 100) continue;
+        const cell = await p.evaluate(
+          async ({ engine, resizePct, n, warmup }) => {
+            const file = new File(window.__benchChunks, "bench_1080p.mp4", { type: "video/mp4" });
+            const bench = window.__sanitizeVideoBench;
+            const total = [];
+            const stage = [];
+            let outBytes = 0;
+            let frames = 0;
+            let usedEngine = "";
+            for (let i = 0; i < warmup + n; i++) {
+              const res = await bench(file, engine, resizePct);
+              if (i >= warmup) {
+                total.push(res.timing.totalMs);
+                stage.push(res.timing.decodeEncodeMs + res.timing.remuxMs);
+              }
+              outBytes = res.outBytes;
+              frames = res.timing.frames;
+              usedEngine = res.engine;
+            }
+            return { total, stage, outBytes, frames, usedEngine, inBytes: file.size };
+          },
+          { engine, resizePct, n: VIDEO_N, warmup: VIDEO_WARMUP },
+        );
+        const row = {
+          browser: engineName,
+          engine: cell.usedEngine,
+          resize: resizePct,
+          inMB: r1(cell.inBytes / (1024 * 1024)),
+          outMB: r1(cell.outBytes / (1024 * 1024)),
+          frames: cell.frames,
+          totalP50: r1(pct(cell.total, 50)),
+          fps: cell.frames > 0 ? r1(cell.frames / (pct(cell.total, 50) / 1000)) : 0,
+        };
+        videoRows.push(row);
+        console.log(`video ${engineName.padEnd(8)} ${row.engine.padEnd(8)} r${String(resizePct).padStart(3)}  total p50 ${row.totalP50}ms  ${row.fps} fps  out ${row.outMB} MB`);
+      }
+    }
+    await b.close();
+  }
+}
+
 const payload = {
   label: LABEL,
   when: new Date().toISOString(),
@@ -114,6 +195,7 @@ const payload = {
   warmup: WARMUP,
   ua: "chromium",
   rows,
+  videoRows,
 };
 const outPath = join(DOCS, `bench-${LABEL}.json`);
 writeFileSync(outPath, JSON.stringify(payload, null, 2));
@@ -160,6 +242,21 @@ md += `| image | in KB | out KB | decode+resize p50 | decode p95 | encode p50 | 
 md += `|---|--:|--:|--:|--:|--:|--:|--:|--:|\n`;
 for (const r of latest.rows) {
   md += `| ${key(r)} | ${r.inKB} | ${r.outKB} | ${r.decodeP50} | ${r.decodeP95} | ${r.encodeP50} | ${r.stripP50} | ${r.totalP50} | ${r.totalP95} |\n`;
+}
+const videoRuns = runs.filter((r) => r.videoRows && r.videoRows.length);
+if (videoRuns.length) {
+  md += `## Video, 1080p30 20 s H.264 clip, per browser and engine\n\n`;
+  md += `Total time from file to audited output through \`window.__sanitizeVideoBench\`. ` +
+    `"reencode" is the full clean (WebCodecs decode and encode, then the Rust rebuild and audit), ` +
+    `"remux" is the basic clean (Rust rebuild and audit only). Headless, software encoders.\n\n`;
+  md += `| build | browser | engine | resize | in MB | out MB | frames | total p50 ms | fps |\n`;
+  md += `|---|---|---|--:|--:|--:|--:|--:|--:|\n`;
+  for (const run of videoRuns) {
+    for (const r of run.videoRows) {
+      md += `| ${run.label} | ${r.browser} | ${r.engine} | ${r.resize}% | ${r.inMB} | ${r.outMB} | ${r.frames} | ${r.totalP50} | ${r.fps} |\n`;
+    }
+  }
+  md += `\n`;
 }
 md += `\n_Generated by \`scripts/bench.mjs\`._\n`;
 

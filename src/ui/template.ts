@@ -8,7 +8,7 @@ export function appMarkup(): string {
       <div class="hero-bar">
         <div class="hero-mark">${ICON.shield}</div>
         <div class="hero-headline">
-          <p class="eyebrow">Browser-only image sanitizer</p>
+          <p class="eyebrow">Browser-only image and video sanitizer</p>
           <h1>STOP<span>TRACKING</span>ME</h1>
         </div>
 
@@ -20,7 +20,7 @@ export function appMarkup(): string {
                 <span class="step-ico step-ico-check">${ICON.check}</span>
                 <span class="step-ico step-ico-lock">${ICON.lock}</span>
               </span>
-              <span class="step-label">Upload<small class="step-hint">Drop an image</small></span>
+              <span class="step-label">Upload<small class="step-hint">Drop a file</small></span>
             </li>
             <li class="step-connector" aria-hidden="true"><i class="connector-fill"></i></li>
             <li class="step is-locked" id="stepClean" aria-disabled="true">
@@ -29,19 +29,20 @@ export function appMarkup(): string {
                 <span class="step-ico step-ico-check">${ICON.check}</span>
                 <span class="step-ico step-ico-lock">${ICON.lock}</span>
               </span>
-              <span class="step-label">Clean image<small class="step-hint">Upload first</small></span>
+              <span class="step-label">Clean file<small class="step-hint">Upload first</small></span>
             </li>
           </ol>
         </nav>
 
         <button id="barReset" class="bar-reset" type="button"
-                aria-label="Start over with a new image">${ICON.refresh}<span>New image</span></button>
+                aria-label="Start over with a new file">${ICON.refresh}<span>New file</span></button>
       </div>
 
       <div class="hero-text">
         <p class="subtitle">
-          Strip EXIF, GPS, XMP, C2PA and hidden metadata from your photos.
-          Everything runs locally in your browser, and your image is never uploaded.
+          Strip EXIF, GPS, XMP, C2PA and hidden metadata from your photos, and the location,
+          device and encoder tags hidden in your videos. Everything runs locally in your browser,
+          and your file is never uploaded.
         </p>
         <ul class="trust" role="list">
           <li>${ICON.check}<span>No uploads</span></li>
@@ -54,60 +55,69 @@ export function appMarkup(): string {
     <div class="carousel" id="carousel">
       <div class="carousel-track">
 
-        <section class="slide" id="slideUpload" aria-label="Step 1: upload an image">
+        <section class="slide" id="slideUpload" aria-label="Step 1: upload a file">
           <div class="panel">
             <div class="dropzone" id="dropzone" role="button" tabindex="0"
-                 aria-label="Drop an image or press Enter to browse">
-              <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+                 aria-label="Drop an image or video, or press Enter to browse">
+              <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.m4v,.mov,.webm,.mkv" hidden />
               <div class="dz-icon">${ICON.upload}</div>
-              <strong class="dz-title">Drop an image here</strong>
+              <strong class="dz-title">Drop an image or video here</strong>
               <span class="dz-sub">or <u>browse files</u></span>
-              <span class="dz-formats">PNG · JPEG · WebP, up to 64&nbsp;MB</span>
+              <span class="dz-formats">PNG · JPEG · WebP up to 64&nbsp;MB · MP4 · MOV · WebM up to 100&nbsp;MB</span>
             </div>
 
             <div class="filecard" id="fileCard" hidden>
               <img id="fileThumb" class="filecard-thumb" alt="" />
+              <video id="fileThumbVideo" class="filecard-thumb" muted playsinline hidden></video>
               <div class="filecard-meta">
                 <strong id="fileName" class="filecard-name"></strong>
                 <span id="fileFacts" class="filecard-facts"></span>
               </div>
-              <button id="clearFile" class="icon-btn" type="button" aria-label="Remove image">${ICON.x}</button>
+              <button id="clearFile" class="icon-btn" type="button" aria-label="Remove file">${ICON.x}</button>
             </div>
 
-            <p id="status" class="status" role="status" aria-live="polite">Select an image to begin.</p>
+            <p id="status" class="status" role="status" aria-live="polite">Select an image or video to begin.</p>
+            <p id="capNote" class="cap-note" hidden></p>
           </div>
         </section>
 
-        <section class="slide" id="slideProcessing" aria-label="Sanitizing your image">
+        <section class="slide" id="slideProcessing" aria-label="Sanitizing your file">
           <div class="panel processing">
             <div class="proc-frame" id="procFrame">
               <img id="procPreview" alt="" />
+              <video id="procPreviewVideo" muted playsinline loop autoplay hidden></video>
               <div class="scanline" aria-hidden="true"></div>
               <div class="proc-check" aria-hidden="true">${ICON.check}</div>
             </div>
             <div class="progress">
               <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
               <p class="progress-stage" id="progressStage">Working…</p>
+              <p class="progress-detail" id="progressDetail" hidden></p>
+              <button id="cancelBtn" class="ghost-btn cancel-btn" type="button" hidden>${ICON.x}<span>Cancel</span></button>
             </div>
           </div>
         </section>
 
-        <section class="slide" id="slideResult" aria-label="Step 2: your clean image">
+        <section class="slide" id="slideResult" aria-label="Step 2: your clean file">
           <div class="panel result-stage" id="resultStage">
             <p class="result-headline" id="resultHeadline"></p>
             <div class="verdict" id="verdict" hidden></div>
 
             <div class="result-canvas">
               <figure class="preview preview-out">
-                <figcaption>Clean image <span class="size-tag" id="outSize"></span></figcaption>
+                <figcaption><span id="outCaption">Clean image</span> <span class="size-tag" id="outSize"></span></figcaption>
                 <div class="preview-frame" id="outFrame">
                   <img id="outputPreview" alt="Sanitized image preview" />
+                  <video id="outputPreviewVideo" controls muted playsinline hidden></video>
                   <div class="frame-pending" id="framePending">Awaiting sanitize</div>
                 </div>
               </figure>
               <figure class="preview preview-before">
                 <figcaption>Before <span class="size-tag" id="origSize"></span></figcaption>
-                <div class="preview-frame"><img id="inputPreview" alt="Original image preview" /></div>
+                <div class="preview-frame">
+                  <img id="inputPreview" alt="Original image preview" />
+                  <video id="inputPreviewVideo" muted playsinline hidden></video>
+                </div>
               </figure>
             </div>
 
@@ -115,7 +125,7 @@ export function appMarkup(): string {
               <div id="downloadArea"></div>
               <div class="result-buttons">
                 <button id="editBtn" class="ghost-btn" type="button">${ICON.edit}<span>Edit</span></button>
-                <button id="newImageBtn" class="ghost-btn" type="button">${ICON.refresh}<span>New image</span></button>
+                <button id="newImageBtn" class="ghost-btn" type="button">${ICON.refresh}<span>New file</span></button>
               </div>
             </div>
 
@@ -130,7 +140,7 @@ export function appMarkup(): string {
                 <span class="switch" aria-hidden="true"></span>
                 <span class="switch-text">
                   <strong>Ultra paranoid mode</strong>
-                  <small>Force PNG output · strict fail-closed checks</small>
+                  <small id="ultraHint">Force PNG output · strict fail-closed checks</small>
                 </span>
               </label>
 
@@ -148,6 +158,26 @@ export function appMarkup(): string {
                   <span class="field-label">Quality <b id="qualityValue">92</b></span>
                   <input id="quality" type="range" min="60" max="100" value="92" />
                 </label>
+              </div>
+
+              <div class="video-options" id="videoOptions" hidden>
+                <label class="switch-row">
+                  <input id="keepAudio" type="checkbox" />
+                  <span class="switch" aria-hidden="true"></span>
+                  <span class="switch-text">
+                    <strong>Keep sound</strong>
+                    <small>Re-encoded, not scrubbed. Voices and audio watermarks stay.</small>
+                  </span>
+                </label>
+                <label class="video-container-row" id="videoContainerRow">
+                  <span class="field-label">Output container</span>
+                  <select id="videoContainer">
+                    <option value="auto">Auto (MP4)</option>
+                    <option value="video/mp4">MP4</option>
+                    <option value="video/webm">WebM</option>
+                  </select>
+                </label>
+                <p class="engine-note" id="engineNote"></p>
               </div>
 
               <div class="adjust-field">
@@ -203,11 +233,11 @@ export function appMarkup(): string {
         <article>
           <h2>How it works</h2>
           <ol class="how-list">
-            <li>Drop or pick a PNG, JPEG or WebP image.</li>
-            <li>We decode it to raw pixels and re-encode a fresh file, so no original bytes survive.</li>
-            <li>Format-specific stripping removes every non-essential chunk/marker.</li>
+            <li>Drop or pick a PNG, JPEG or WebP image, or an MP4, MOV or WebM video.</li>
+            <li>Images are decoded to raw pixels and re-encoded fresh. Videos are decoded frame by frame and re-encoded with your browser's encoder, or rebuilt from the raw samples when it has none.</li>
+            <li>Format-specific stripping removes every non-essential chunk, box, marker and in-stream encoder tag.</li>
             <li>A strict audit re-scans the output. If anything looks off, download is blocked.</li>
-            <li>Download your verified-clean image.</li>
+            <li>Download your verified-clean file.</li>
           </ol>
         </article>
         <article>
@@ -219,6 +249,9 @@ export function appMarkup(): string {
             <li><b>JPEG APP/COM</b>: app marker segments.</li>
             <li><b>PNG text chunks</b>: tEXt, zTXt, iTXt and vendor chunks.</li>
             <li><b>WebP EXIF/XMP/ICCP</b>: metadata chunks.</li>
+            <li><b>MP4 / MOV</b>: GPS, Apple and Android keys, creation dates, encoder names, unique IDs, C2PA, XMP, hidden tracks and padding.</li>
+            <li><b>WebM / MKV</b>: tags, title, dates, segment IDs, attachments, chapters, padding.</li>
+            <li><b>Inside the video stream</b>: encoder strings (x264, VideoToolbox SEI) and AV1 metadata.</li>
           </ul>
         </article>
       </div>
@@ -239,7 +272,19 @@ export function appMarkup(): string {
         </details>
         <details>
           <summary>Why force PNG in Ultra Paranoid mode?</summary>
-          <p>PNG is a simpler container with fewer metadata edge-cases, so the fail-closed checks can be stricter and more certain.</p>
+          <p>PNG is a simpler container with fewer metadata edge-cases, so the fail-closed checks can be stricter and more certain. For video, Ultra Paranoid always re-encodes when the browser can, removes the sound, and writes MP4.</p>
+        </details>
+        <details>
+          <summary>Full clean or basic clean for video?</summary>
+          <p><b>Full clean</b> decodes every frame and re-encodes it with your browser's own video encoder, which also drops the original encoder's fingerprint and weakens fragile hidden patterns. <b>Basic clean</b> rebuilds the container from the raw samples and strips every metadata box and in-stream tag, but leaves the picture and sound bytes as they were. You get the full clean whenever your browser has a WebCodecs encoder; otherwise the page tells you and falls back to the basic clean.</p>
+        </details>
+        <details>
+          <summary>Why does video take longer?</summary>
+          <p>A full clean re-encodes every frame. A minute of 1080p video can take from a few seconds on a desktop to a few minutes on a phone. The basic clean is a byte copy and takes seconds.</p>
+        </details>
+        <details>
+          <summary>Does this remove AI watermarks?</summary>
+          <p>No. This tool does not detect or remove AI watermarks such as Google SynthID, and it is not a way to hide that a video is AI-generated. Re-encoding reduces what fragile hidden patterns can survive, but that is never a guarantee.</p>
         </details>
       </div>
 

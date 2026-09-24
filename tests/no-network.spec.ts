@@ -39,3 +39,25 @@ test("sanitize flow does not make external network requests", async ({ page }) =
 
   expect(externalRequests, `unexpected external requests: ${externalRequests.join(", ")}`).toEqual([]);
 });
+
+test("video clean does not make external network requests and previews play", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  const origin = new URL(page.url()).origin;
+  const externalRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.startsWith("blob:") || url.startsWith("data:")) return;
+    if (url.startsWith(origin)) return;
+    externalRequests.push(url);
+  });
+  const { readFileSync } = await import("node:fs");
+  const buffer = readFileSync(new URL("./fixtures/keys_x264.mp4", import.meta.url));
+  await page.setInputFiles("#fileInput", { name: "keys_x264.mp4", mimeType: "video/mp4", buffer });
+  await expect(page.locator("#downloadArea a")).toBeVisible({ timeout: 150_000 });
+  await page.waitForFunction(() => {
+    const v = document.querySelector<HTMLVideoElement>("#outputPreviewVideo");
+    return !!v && !v.hidden && v.readyState >= 1;
+  });
+  expect(externalRequests, `unexpected external requests: ${externalRequests.join(", ")}`).toEqual([]);
+});
