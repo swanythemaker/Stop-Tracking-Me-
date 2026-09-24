@@ -16,19 +16,33 @@ const commit =
     }
   })();
 
+const isolationHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit),
+    __MODELS_BASE__: JSON.stringify(process.env.VITE_MODELS_BASE || "/models"),
+  },
+  optimizeDeps: {
+    exclude: ["onnxruntime-web", "@huggingface/transformers"],
+  },
+  worker: {
+    format: "es",
   },
   server: {
     host: "0.0.0.0",
     port: 8888,
     strictPort: true,
+    headers: isolationHeaders,
   },
   preview: {
     host: "0.0.0.0",
     port: 8888,
     strictPort: true,
+    headers: isolationHeaders,
   },
 });

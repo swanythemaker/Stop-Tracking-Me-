@@ -1,12 +1,27 @@
 import { decodeAndTransform, stripAndAudit, auditBytes } from "../wasm/sanitize_core.js";
 import { isSupportedImageType, MAX_IMAGE_BYTES, type AuditSummary, type SupportedFormat } from "./formats";
-import type { AuditRequest, ImageSuccess, SanitizeRequest, SanitizeStage } from "./types";
+import type { AuditRequest, DecodeDone, DecodeOnlyRequest, ImageSuccess, SanitizeRequest, SanitizeStage } from "./types";
+import type { LoadProgress } from "./models/loader";
 
 import encodeJpeg from "@jsquash/jpeg/encode";
 import encodePng from "@jsquash/png/encode";
 import encodeWebp from "@jsquash/webp/encode";
 
-type ImageProgress = (stage: SanitizeStage, pct: number) => void;
+type ImageProgress = (stage: SanitizeStage, pct: number, detail?: string) => void;
+
+export function decodeOnly(request: DecodeOnlyRequest): DecodeDone {
+  const opts = JSON.stringify({
+    resizePct: clampPct(request.resizePct),
+    rotate: request.rotate,
+    flipH: request.flipH,
+    flipV: request.flipV,
+  });
+  const decoded = decodeAndTransform(new Uint8Array(request.inputBuffer), opts);
+  const width = decoded.width;
+  const height = decoded.height;
+  const rgba = decoded.takeRgba();
+  return { type: "decode-done", requestId: request.requestId, rgba: rgba.slice().buffer, width, height };
+}
 
 export function auditImage(request: AuditRequest): AuditSummary {
   try {
@@ -22,7 +37,7 @@ export function auditImage(request: AuditRequest): AuditSummary {
   }
 }
 
-export async function sanitizeImage(request: SanitizeRequest, report: ImageProgress): Promise<ImageSuccess> {
+export async function sanitizeImage(request: SanitizeRequest, report: ImageProgress, signal?: AbortSignal): Promise<ImageSuccess> {
   report("read", 5);
   if (!isSupportedImageType(request.sourceType)) {
     throw new Error(`Unsupported input type "${request.sourceType || "unknown"}". Use PNG, JPEG or WebP.`);
@@ -56,8 +71,40 @@ export async function sanitizeImage(request: SanitizeRequest, report: ImageProgr
   const origWidth = decoded.origWidth;
   const origHeight = decoded.origHeight;
   const rgba = decoded.takeRgba();
-  const imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
   const tDecoded = performance.now();
+
+  let modelMs = 0;
+  let inpaintMs = 0;
+  let reduceMs = 0;
+  if (request.inpaint) {
+    const { runInpaint } = await import("./inpaint/index");
+    const tModel = performance.now();
+    let loaded = false;
+    await runInpaint(
+      request.inpaint,
+      rgba,
+      width,
+      height,
+      (p: LoadProgress) => {
+        if (!loaded) report("model", 30, `${mb(p.loaded)} of ${mb(p.total)}`);
+        if (p.loaded >= p.total && !loaded) {
+          loaded = true;
+          modelMs = performance.now() - tModel;
+          report("inpaint", 45);
+        }
+      },
+      signal,
+    );
+    inpaintMs = performance.now() - tModel - modelMs;
+  }
+  if (request.reduce) {
+    const { reduceImage } = await import("./reduce/pipeline");
+    const tReduce = performance.now();
+    report("reduce", 50);
+    await reduceImage(rgba, width, height, (p: LoadProgress) => report("model", 50, `${mb(p.loaded)} of ${mb(p.total)}`), signal);
+    reduceMs = performance.now() - tReduce;
+  }
+  const imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
 
   report("encode", 55);
   const encoded = await encodeWithWasm(outputType, imageData, clampQuality(outputType, request.quality));
@@ -89,9 +136,14 @@ export async function sanitizeImage(request: SanitizeRequest, report: ImageProgr
     height,
     origWidth,
     origHeight,
+    inpainted: !!request.inpaint,
+    reduced: !!request.reduce,
     timing: {
       decodeMs: tDecoded - tStart,
-      encodeMs: tEncoded - tDecoded,
+      modelMs,
+      inpaintMs,
+      reduceMs,
+      encodeMs: tEncoded - tDecoded - modelMs - inpaintMs - reduceMs,
       stripMs: tStripped - tEncoded,
       totalMs: tStripped - tStart,
     },

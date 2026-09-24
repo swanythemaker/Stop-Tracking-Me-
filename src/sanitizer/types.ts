@@ -7,6 +7,13 @@ export type OutputContainer = VideoContainer | "video/x-matroska";
 
 export type VideoEngine = "reencode" | "remux";
 
+export type InpaintSpec = {
+  engine: "migan" | "lama";
+  mask: ArrayBuffer;
+  maskWidth: number;
+  maskHeight: number;
+};
+
 export type SanitizeRequest = {
   kind: "sanitize";
   requestId: number;
@@ -19,6 +26,8 @@ export type SanitizeRequest = {
   rotate: number;
   flipH: boolean;
   flipV: boolean;
+  inpaint?: InpaintSpec;
+  reduce?: boolean;
 };
 
 export type AuditRequest = {
@@ -56,6 +65,35 @@ type CancelRequest = {
   requestId: number;
 };
 
+export type DecodeOnlyRequest = {
+  kind: "decode-only";
+  requestId: number;
+  sourceType: string;
+  inputBuffer: ArrayBuffer;
+  resizePct: number;
+  rotate: number;
+  flipH: boolean;
+  flipV: boolean;
+};
+
+export type DecodeDone = {
+  type: "decode-done";
+  requestId: number;
+  rgba: ArrayBuffer;
+  width: number;
+  height: number;
+};
+
+type ReleaseModelsRequest = {
+  kind: "release-models";
+  requestId: number;
+};
+
+type DeleteModelsRequest = {
+  kind: "delete-models";
+  requestId: number;
+};
+
 type WarmRequest = {
   kind: "warm";
   requestId: number;
@@ -67,9 +105,12 @@ export type WorkerRequest =
   | VideoSanitizeRequest
   | AuditVideoRequest
   | CancelRequest
+  | DecodeOnlyRequest
+  | ReleaseModelsRequest
+  | DeleteModelsRequest
   | WarmRequest;
 
-export type SanitizeStage = "read" | "decode" | "encode" | "strip" | "audit";
+export type SanitizeStage = "read" | "decode" | "model" | "inpaint" | "reduce" | "encode" | "strip" | "audit";
 type VideoStage = "probe" | "scan" | "decode" | "transform" | "encode" | "mux" | "remux" | "audit";
 export type Stage = SanitizeStage | VideoStage;
 
@@ -84,6 +125,9 @@ export type WorkerProgress = {
 
 type SanitizeTiming = {
   decodeMs: number;
+  modelMs: number;
+  inpaintMs: number;
+  reduceMs: number;
   encodeMs: number;
   stripMs: number;
   totalMs: number;
@@ -111,6 +155,8 @@ export type ImageSuccess = {
   height: number;
   origWidth: number;
   origHeight: number;
+  inpainted: boolean;
+  reduced: boolean;
   timing: SanitizeTiming;
 };
 
@@ -158,5 +204,10 @@ export type WarmDone = {
   requestId: number;
 };
 
-type WorkerResponse = WorkerSuccess | WorkerFailure | AuditDone | WarmDone;
+type ModelsDeleted = {
+  type: "models-deleted";
+  requestId: number;
+};
+
+type WorkerResponse = WorkerSuccess | WorkerFailure | AuditDone | WarmDone | ModelsDeleted | DecodeDone;
 export type WorkerMessage = WorkerProgress | WorkerResponse;

@@ -61,3 +61,38 @@ test("video clean does not make external network requests and previews play", as
   });
   expect(externalRequests, `unexpected external requests: ${externalRequests.join(", ")}`).toEqual([]);
 });
+
+test("remove marked area fetches exactly the pinned model file and nothing else", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "one engine is enough for the fetch contract");
+  test.setTimeout(300_000);
+  await page.goto("/");
+  const origin = new URL(page.url()).origin;
+  const external: string[] = [];
+  const models: string[] = [];
+  page.on("request", (r) => {
+    const url = r.url();
+    if (url.startsWith("blob:") || url.startsWith("data:")) return;
+    if (!url.startsWith(origin)) external.push(url);
+    else if (new URL(url).pathname.startsWith("/models/")) models.push(new URL(url).pathname);
+  });
+  const png = await page.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 160;
+    c.height = 120;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#1f7a4f";
+    x.fillRect(0, 0, 160, 120);
+    x.fillStyle = "#fff";
+    x.fillRect(120, 100, 36, 16);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), "image/png"));
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+  await page.setInputFiles("#fileInput", { name: "s.png", mimeType: "image/png", buffer: Buffer.from(png) });
+  await expect(page.locator("#downloadArea a")).toBeVisible({ timeout: 30_000 });
+  await page.locator("#editBtn").click();
+  await page.locator("#maskCornerBr").click();
+  await page.locator("#removeBtn").click();
+  await expect(page.locator(".verdict")).toContainText("marked area filled", { timeout: 240_000 });
+  expect(external).toEqual([]);
+  expect([...new Set(models)]).toEqual(["/models/migan_pipeline_v2-6f1f3530a1a2.onnx"]);
+});

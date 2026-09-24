@@ -2,6 +2,8 @@ import type {
   AuditDone,
   AuditRequest,
   AuditVideoRequest,
+  DecodeDone,
+  DecodeOnlyRequest,
   ImageSuccess,
   SanitizeRequest,
   Stage,
@@ -17,6 +19,7 @@ type ProgressFn = (stage: Stage, pct: number, detail?: string, etaS?: number) =>
 type Pending =
   | { kind: "sanitize"; resolve: (v: WorkerSuccess) => void; reject: (e: Error) => void; onProgress?: ProgressFn }
   | { kind: "audit"; resolve: (v: AuditDone) => void; reject: (e: Error) => void }
+  | { kind: "decode"; resolve: (v: DecodeDone) => void; reject: (e: Error) => void }
   | { kind: "warm"; resolve: (v: WarmDone) => void; reject: (e: Error) => void };
 
 export class SanitizeClient {
@@ -33,16 +36,22 @@ export class SanitizeClient {
     );
   }
 
-  sanitize(req: Omit<SanitizeRequest, "requestId" | "kind">, onProgress?: ProgressFn): Promise<ImageSuccess> {
+  sanitize(
+    req: Omit<SanitizeRequest, "requestId" | "kind">,
+    onProgress?: ProgressFn,
+  ): Promise<ImageSuccess> & { requestId: number } {
     const requestId = ++this.nextId;
     const full: SanitizeRequest = { ...req, kind: "sanitize", requestId };
-    return new Promise<WorkerSuccess>((resolve, reject) => {
+    const transfer: Transferable[] = [full.inputBuffer];
+    if (full.inpaint) transfer.push(full.inpaint.mask);
+    const promise = new Promise<WorkerSuccess>((resolve, reject) => {
       this.pending.set(requestId, { kind: "sanitize", resolve, reject, onProgress });
-      this.worker.postMessage(full, [full.inputBuffer]);
+      this.worker.postMessage(full, transfer);
     }).then((res) => {
       if (res.media !== "image") throw new Error("Unexpected video result.");
       return res;
     });
+    return Object.assign(promise, { requestId });
   }
 
   sanitizeVideo(
@@ -83,6 +92,27 @@ export class SanitizeClient {
     this.worker.postMessage({ kind: "cancel", requestId });
   }
 
+  decodeOnly(req: Omit<DecodeOnlyRequest, "requestId" | "kind">): Promise<DecodeDone> {
+    const requestId = ++this.nextId;
+    const full: DecodeOnlyRequest = { ...req, kind: "decode-only", requestId };
+    return new Promise<DecodeDone>((resolve, reject) => {
+      this.pending.set(requestId, { kind: "decode", resolve, reject });
+      this.worker.postMessage(full, [full.inputBuffer]);
+    });
+  }
+
+  releaseModels(): void {
+    this.worker.postMessage({ kind: "release-models", requestId: ++this.nextId });
+  }
+
+  deleteModels(): Promise<void> {
+    const requestId = ++this.nextId;
+    return new Promise<void>((resolve, reject) => {
+      this.pending.set(requestId, { kind: "warm", resolve: () => resolve(), reject });
+      this.worker.postMessage({ kind: "delete-models", requestId });
+    });
+  }
+
   warm(): Promise<WarmDone> {
     const requestId = ++this.nextId;
     return new Promise<WarmDone>((resolve, reject) => {
@@ -107,8 +137,13 @@ export class SanitizeClient {
       return;
     }
 
-    if (msg.type === "warm-done") {
-      if (p.kind === "warm") p.resolve(msg);
+    if (msg.type === "decode-done") {
+      if (p.kind === "decode") p.resolve(msg);
+      return;
+    }
+
+    if (msg.type === "warm-done" || msg.type === "models-deleted") {
+      if (p.kind === "warm") p.resolve({ type: "warm-done", requestId: msg.requestId });
       return;
     }
 

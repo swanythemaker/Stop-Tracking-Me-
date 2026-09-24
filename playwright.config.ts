@@ -11,8 +11,9 @@ export default defineConfig({
     reducedMotion: "reduce",
   },
   projects: [
-    { name: "chromium", use: { browserName: "chromium" } },
-    { name: "firefox", use: { browserName: "firefox" } },
+    { name: "unit", testMatch: /tests\/unit\/.*\.spec\.ts/ },
+    { name: "chromium", use: { browserName: "chromium" }, testIgnore: /tests\/unit\// },
+    { name: "firefox", use: { browserName: "firefox" }, testIgnore: /tests\/unit\// },
   ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 8890",

@@ -187,6 +187,60 @@ if (VIDEO) {
   }
 }
 
+const MODELS = process.env.BENCH_MODELS === "1";
+const MODEL_N = Number(process.env.BENCH_MODELS_N || 3);
+const modelRows = [];
+if (MODELS) {
+  const b = await chromium.launch();
+  const ctx = await b.newContext();
+  const p = await ctx.newPage();
+  await p.goto(BASE, { waitUntil: "networkidle" });
+  await p.waitForFunction(() => typeof window.__sanitizeBench === "function", { timeout: 15000 });
+  for (const size of [1024, 2048]) {
+    for (const job of [{ inpaint: "migan" }, { inpaint: "lama" }, { reduce: true }]) {
+      const cell = await p.evaluate(
+        async ({ size, job, n }) => {
+          const c = document.createElement("canvas");
+          c.width = size;
+          c.height = size;
+          const x = c.getContext("2d");
+          const g = x.createLinearGradient(0, 0, size, size);
+          g.addColorStop(0, "#123a2a");
+          g.addColorStop(1, "#d4b25a");
+          x.fillStyle = g;
+          x.fillRect(0, 0, size, size);
+          x.fillStyle = "#fff";
+          x.fillRect(size * 0.8, size * 0.9, size * 0.18, size * 0.07);
+          const blob = await new Promise((res) => c.toBlob((bb) => res(bb), "image/png"));
+          const base = await blob.arrayBuffer();
+          const bench = window.__sanitizeBench;
+          const models = { ...job, maskPct: 15, width: size, height: size };
+          const first = await bench(base.slice(0), "image/png", "image/png", true, 100, models);
+          const model = [];
+          const step = [];
+          for (let i = 0; i < n; i++) {
+            const r = await bench(base.slice(0), "image/png", "image/png", true, 100, models);
+            model.push(r.timing.modelMs);
+            step.push(job.reduce ? r.timing.reduceMs : r.timing.inpaintMs);
+          }
+          return { coldModelMs: first.timing.modelMs, coldStepMs: job.reduce ? first.timing.reduceMs : first.timing.inpaintMs, model, step };
+        },
+        { size, job, n: MODEL_N },
+      );
+      const row = {
+        size,
+        job: job.inpaint || "reduce",
+        coldModelMs: r1(cell.coldModelMs),
+        warmModelMs: r1(pct(cell.model, 50)),
+        stepP50: r1(pct(cell.step, 50)),
+      };
+      modelRows.push(row);
+      console.log(`model ${row.job.padEnd(6)} ${String(size).padStart(4)}²  cold model ${row.coldModelMs}ms  warm ${row.warmModelMs}ms  step p50 ${row.stepP50}ms`);
+    }
+  }
+  await b.close();
+}
+
 const payload = {
   label: LABEL,
   when: new Date().toISOString(),
@@ -196,6 +250,7 @@ const payload = {
   ua: "chromium",
   rows,
   videoRows,
+  modelRows,
 };
 const outPath = join(DOCS, `bench-${LABEL}.json`);
 writeFileSync(outPath, JSON.stringify(payload, null, 2));
@@ -254,6 +309,19 @@ if (videoRuns.length) {
   for (const run of videoRuns) {
     for (const r of run.videoRows) {
       md += `| ${run.label} | ${r.browser} | ${r.engine} | ${r.resize}% | ${r.inMB} | ${r.outMB} | ${r.frames} | ${r.totalP50} | ${r.fps} |\n`;
+    }
+  }
+  md += `\n`;
+}
+const modelRuns = runs.filter((r) => r.modelRows && r.modelRows.length);
+if (modelRuns.length) {
+  md += `## Local models, square synthetic image with a 15 percent corner mask, Chromium\n\n`;
+  md += `"cold model" is the first session (download or cache read, hash check, session create); "warm" is a reused session. "step" is the inference itself, per \`window.__sanitizeBench\`. Firefox numbers are not listed: the Playwright Firefox build runs onnxruntime wasm 7 to 20 times slower than a release Firefox, see docs/spikes-v0.8.0.md.\n\n`;
+  md += `| build | job | image | cold model ms | warm model ms | step p50 ms |\n`;
+  md += `|---|---|--:|--:|--:|--:|\n`;
+  for (const run of modelRuns) {
+    for (const r of run.modelRows) {
+      md += `| ${run.label} | ${r.job} | ${r.size}² | ${r.coldModelMs} | ${r.warmModelMs} | ${r.stepP50} |\n`;
     }
   }
   md += `\n`;

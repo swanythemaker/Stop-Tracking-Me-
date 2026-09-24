@@ -20,6 +20,10 @@ import { StepFlow } from "./ui/stepflow";
 import { must, formatBytes, shortType, extForMime, explainError } from "./ui/format";
 import { renderVerdict, renderDownload, renderScanCard } from "./ui/render";
 import { setMediaPreview, loadImageDimensions, loadVideoDimensions, formatDuration, type PreviewPair } from "./ui/preview";
+import { MaskEditor } from "./ui/maskEditor";
+import { WatermarkPanel } from "./ui/watermarkPanel";
+import { storedModelBytes } from "./sanitizer/models/loader";
+import { DetectClient } from "./sanitizer/detect/client";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
@@ -110,6 +114,9 @@ const STAGE_TEXT: Record<Stage, string> = {
   probe: "Reading video…",
   scan: "Scanning metadata…",
   decode: "Decoding…",
+  model: "Downloading model…",
+  inpaint: "Filling the marked area…",
+  reduce: "Reducing hidden patterns…",
   transform: "Applying edits…",
   encode: "Re-encoding a clean copy…",
   mux: "Writing container…",
@@ -137,6 +144,29 @@ let dragDepth = 0;
 let currentRequestId: number | null = null;
 let wakeLock: WakeLockSentinel | null = null;
 let videoCap: VideoCapability | null = null;
+
+let inpaintArmed = false;
+
+const maskEditor = new MaskEditor(outFrame, outputPair.img, () => onMaskChange());
+const panel = new WatermarkPanel(maskEditor, {
+  onRemove: () => {
+    if (!maskEditor.getMask()) return;
+    inpaintArmed = true;
+    scheduleReclean();
+  },
+  onFind: () => void findWatermark(),
+  onReduceChange: () => scheduleReclean(),
+  onDelete: () => {
+    void client.deleteModels().then(() => refreshModelStore());
+  },
+  onCancel: () => {
+    cancelCurrent();
+    detector.cancel();
+  },
+});
+void refreshModelStore();
+const detector = new DetectClient();
+let finding = false;
 
 let resizePct = 100;
 let customResize = false;
@@ -179,26 +209,36 @@ resizeSlider.addEventListener("input", () => {
 rotateLeft.addEventListener("click", () => {
   rotateDeg = (rotateDeg + 270) % 360;
   syncRotateFlipUi();
+  remapMask({ rotate: 270 });
   updateAdjust();
 });
 rotateRight.addEventListener("click", () => {
   rotateDeg = (rotateDeg + 90) % 360;
   syncRotateFlipUi();
+  remapMask({ rotate: 90 });
   updateAdjust();
 });
 flipHBtn.addEventListener("click", () => {
   flipHState = !flipHState;
   syncRotateFlipUi();
+  remapMask({ flipH: true });
   updateAdjust();
 });
 flipVBtn.addEventListener("click", () => {
   flipVState = !flipVState;
   syncRotateFlipUi();
+  remapMask({ flipV: true });
   updateAdjust();
 });
 
-editBtn.addEventListener("click", () => flow.setEditing(true));
-editDone.addEventListener("click", () => flow.setEditing(false));
+editBtn.addEventListener("click", () => {
+  flow.setEditing(true);
+  setMasking(true);
+});
+editDone.addEventListener("click", () => {
+  flow.setEditing(false);
+  setMasking(false);
+});
 newImageBtn.addEventListener("click", () => resetToUpload());
 barReset.addEventListener("click", () => resetToUpload());
 cancelBtn.addEventListener("click", () => cancelCurrent());
@@ -252,6 +292,10 @@ window.addEventListener("drop", async (event) => {
 async function handleFileSelection(file: File | null): Promise<void> {
   cancelCurrent();
   clearDownload();
+  inpaintArmed = false;
+  maskEditor.clear();
+  client.releaseModels();
+  detector.release();
   selectedFile = null;
   selectedKind = null;
   selectedType = "";
@@ -410,7 +454,8 @@ async function clean(mode: "first" | "reclean"): Promise<void> {
       res = await job.result;
     } else {
       const inputBuffer = await selectedFile.arrayBuffer();
-      res = await client.sanitize(
+      const mask = inpaintArmed ? maskEditor.getMask() : null;
+      const job = client.sanitize(
         {
           sourceType: selectedFile.type,
           inputBuffer,
@@ -421,9 +466,19 @@ async function clean(mode: "first" | "reclean"): Promise<void> {
           rotate: rotateDeg,
           flipH: flipHState,
           flipV: flipVState,
+          inpaint: mask
+            ? { engine: panel.getEngine(), mask: mask.mask.slice().buffer, maskWidth: mask.width, maskHeight: mask.height }
+            : undefined,
+          reduce: panel.reduce.checked,
         },
-        (stage, pct) => setStage(stage, pct),
+        (stage, pct, detail) => {
+          setStage(stage, pct, detail);
+          if (mode === "reclean") panel.setModelProgress(stage === "model" ? `${STAGE_TEXT.model} ${detail ?? ""}` : null);
+        },
       );
+      currentRequestId = job.requestId;
+      panel.setBusy(true);
+      res = await job;
     }
 
     if (mode === "first") {
@@ -452,6 +507,9 @@ async function clean(mode: "first" | "reclean"): Promise<void> {
     currentRequestId = null;
     cancelBtn.hidden = true;
     progressDetail.hidden = true;
+    panel.setBusy(false);
+    panel.setModelProgress(null);
+    void refreshModelStore();
     releaseWakeLock();
     outFrame.classList.remove("loading");
     flow.syncHeight();
@@ -477,6 +535,7 @@ function populateResult(res: WorkerSuccess): void {
 
   renderDownload(downloadArea, url, safeName, outBytes, res.media);
   const video = res.media === "video" ? (res as VideoSuccess) : null;
+  if (res.media === "image") maskEditor.setDims(res.width, res.height);
   renderVerdict(verdict, true, "", {
     inBytes: res.inputByteLength,
     outBytes,
@@ -489,6 +548,8 @@ function populateResult(res: WorkerSuccess): void {
     audioKept: video?.audioKept,
     durationS: video?.durationS,
     note: video?.engineReason && video.engine === "remux" && videoCap?.mode === "reencode" ? `Basic clean used: ${video.engineReason}` : undefined,
+    inpainted: res.media === "image" ? res.inpainted : undefined,
+    reduced: res.media === "image" ? res.reduced : undefined,
   });
   if (video) syncEngineNote(video.engine);
 
@@ -552,6 +613,7 @@ function scheduleReclean(): void {
 
 function setResizePct(pct: number, fromSlider = false): void {
   resizePct = Math.min(100, Math.max(10, Math.round(pct || 100)));
+  remapMask({});
   for (const seg of resizeSegs) {
     seg.classList.toggle("is-active", !customResize && Number(seg.dataset.pct) === resizePct);
   }
@@ -650,7 +712,79 @@ function syncMediaUi(): void {
   outCaption.textContent = isVideo ? "Clean video" : "Clean image";
   videoOptions.hidden = !isVideo;
   advanced.hidden = isVideo;
+  panel.setVisible(!isVideo);
   syncUltraParanoidUi();
+}
+
+function setMasking(on: boolean): void {
+  const active = on && selectedKind === "image";
+  maskEditor.setActive(active);
+  must<HTMLElement>("#resultStage").classList.toggle("is-masking", active);
+}
+
+function onMaskChange(): void {
+  panel.syncState();
+  if (!maskEditor.getMask() && inpaintArmed) {
+    inpaintArmed = false;
+    scheduleReclean();
+  }
+}
+
+function remapMask(delta: { rotate?: number; flipH?: boolean; flipV?: boolean }): void {
+  const dims = outputDims();
+  if (!dims || !maskEditor.getMask()) return;
+  maskEditor.remap({ rotate: delta.rotate ?? 0, flipH: !!delta.flipH, flipV: !!delta.flipV }, dims.w, dims.h);
+}
+
+async function findWatermark(): Promise<void> {
+  if (!selectedFile || selectedKind !== "image" || finding) return;
+  finding = true;
+  panel.setBusy(true);
+  panel.setModelProgress("Preparing image");
+  try {
+    const decoded = await client.decodeOnly({
+      sourceType: selectedFile.type,
+      inputBuffer: await selectedFile.arrayBuffer(),
+      resizePct,
+      rotate: rotateDeg,
+      flipH: flipHState,
+      flipV: flipVState,
+    });
+    maskEditor.setDims(decoded.width, decoded.height);
+    const boxes = await detector.detect(decoded.rgba, decoded.width, decoded.height, (stage, loaded, total, detail) => {
+      if (stage === "model") panel.setModelProgress("Downloading Find watermark", loaded, total);
+      else panel.setModelProgress(`Looking for ${detail ?? "watermarks"}… about 30 s`);
+    });
+    if (boxes.length) {
+      maskEditor.setProposals(boxes);
+      setStatus(`Found ${boxes.length} ${boxes.length === 1 ? "area" : "areas"}. Click a box to accept it, or accept all.`, "good");
+    } else {
+      setStatus("Nothing found. Mark the area by hand.", "muted");
+    }
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : "Find watermark failed.", "bad");
+  } finally {
+    finding = false;
+    panel.setBusy(false);
+    panel.setModelProgress(null);
+    void refreshModelStore();
+  }
+}
+
+async function refreshModelStore(): Promise<void> {
+  try {
+    panel.setStore(await storedModelBytes());
+  } catch {
+    panel.setStore(0);
+  }
+}
+
+if (import.meta.env.DEV) {
+  (window as unknown as { __maskDebug?: unknown }).__maskDebug = () => ({
+    coverage: maskEditor.coverage(),
+    bbox: maskEditor.bbox(),
+    armed: inpaintArmed,
+  });
 }
 
 function clearDownload(): void {
@@ -736,7 +870,17 @@ if (typeof ric === "function") {
   outputType: SupportedFormat | "same",
   ultra: boolean,
   resizePct = 100,
+  models?: { inpaint?: "migan" | "lama"; maskPct?: number; reduce?: boolean; width?: number; height?: number },
 ) => {
+  let inpaint;
+  if (models?.inpaint && models.width && models.height) {
+    const w = models.width;
+    const h = models.height;
+    const side = Math.round(Math.sqrt((models.maskPct ?? 15) / 100) * Math.min(w, h));
+    const mask = new Uint8Array(w * h);
+    for (let y = h - side; y < h; y++) mask.fill(255, y * w + (w - side), y * w + w);
+    inpaint = { engine: models.inpaint, mask: mask.buffer, maskWidth: w, maskHeight: h };
+  }
   const res = await client.sanitize({
     sourceType,
     inputBuffer: buffer,
@@ -747,6 +891,8 @@ if (typeof ric === "function") {
     rotate: 0,
     flipH: false,
     flipV: false,
+    inpaint,
+    reduce: models?.reduce,
   });
   return {
     timing: res.timing,

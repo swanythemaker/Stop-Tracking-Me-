@@ -8,7 +8,7 @@ const BANNED = [
 const SCAN_EXT = new Set([".ts", ".css", ".html", ".md", ".mjs"]);
 const SKIP_DIRS = new Set(["src/wasm"]);
 
-const roots = ["README.md", "index.html", "src", "scripts", "tests"];
+const roots = ["README.md", "index.html", "src", "scripts", "tests", "docs"];
 const files = [];
 function walk(p) {
   if (SKIP_DIRS.has(p)) return;

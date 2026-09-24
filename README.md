@@ -2,7 +2,7 @@
 
 **Strip the tracking out of your photos and videos, in your browser, before you share them.**
 
-Current release: **v0.7.0**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.8.0**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 
@@ -30,8 +30,8 @@ chunk, then **re-audits the output bytes**. If anything questionable survives, t
 blocked. You never get a file that wasn't verified.
 
 - **No uploads.** All processing happens in a Web Worker on your machine.
-- **No network.** The production build ships a Content-Security-Policy that blocks every
-  outbound connection.
+- **No network.** The production build ships a Content-Security-Policy that allows exactly one
+  kind of request: our own model files, after you click a feature that needs one.
 - **Fail-closed.** Output is released only after it passes a strict audit.
 - **Deterministic where it can be.** Images and the basic video clean run entirely inside the
   audited WebAssembly core, so the cleaned output is byte-for-byte identical in every browser.
@@ -157,18 +157,55 @@ frame path for Firefox is on the roadmap.
 Animations are GPU-composited and respect `prefers-reduced-motion`, so the interface stays smooth
 without getting in the way.
 
-## Local models: size is not a constraint
+## Remove a watermark or overlay
 
-Any future feature that needs a machine-learning model (watermark detection, inpainting,
-video filters) loads that model **on demand**, only when the user picks the feature, and never at
-page load. The rule for this project:
+Open the editor on a cleaned image and mark the watermark: paint it with the brush, or press one
+of the four corner presets. Then press **Remove marked area**. The marked pixels are filled by a
+local inpainting model and the result goes through the same encode, strip and audit as every other
+image. Only the marked pixels change; every pixel outside the mask is byte-identical to the plain
+clean.
 
-- Model size is not a selection criterion. An 800 MB local model is fine.
-- Models are fetched lazily, with a visible progress indicator, and cached locally
-  (Cache Storage or OPFS) so the download happens once.
-- Inference runs on the CPU in a Web Worker, fully local, so the no-network promise for the
-  image itself still holds. The model download is the only network request, and it is opt-in.
-- Pick models by quality and CPU speed, not by bundle size.
+| Remover | Model | Download | Measured on this machine, Chromium, 4 threads | Best for |
+|---|---|---|---|---|
+| Fast | MI-GAN (MIT) | 28 MB | about 1 s per marked area at any image size | logos, stamps, small and medium areas |
+| High quality | LaMa (Apache-2.0) | 208 MB | 38 s for a 15 percent corner of a 1024 px image, 45 s at 2048 px | large areas, repeating textures |
+
+**Find watermark** runs Florence-2-base (MIT, 275 MB) with the words "watermark" and "text" and
+proposes boxes you can accept one by one or all at once. It is a button, never automatic, because
+it takes about 6 s per word in Chromium and much longer in Firefox.
+
+The fill is generated locally and can look soft on large areas. The times above are from
+`docs/bench.md` and `docs/spikes-v0.8.0.md`.
+
+## Reduce hidden marks
+
+An optional switch runs a fixed pipeline on the decoded pixels before encode: a TAESD autoencoder
+round trip (MIT, 10 MB), a bilinear resample to 90 percent and back, and a requantize to 6 bits
+per channel. It takes about 30 s for a 1024 px image and 105 s at 2048 px on this machine. On this machine, 20 images carrying the DWT-DCT mark that older Stable Diffusion
+builds add all decoded before the pipeline and 0 of 20 decoded after it.
+
+It does not remove SynthID. Simple edits and autoencoder round trips leave SynthID-Image
+detectable (99.72 percent in the worst case in Google's own paper, 0 of 20 removed by a VAE round
+trip in the published comparison). The only local method with evidence against it is low-strength
+diffusion regeneration, which the v0.8.0 spike measured at 11 to 16 minutes per image in Chromium
+and over an hour in Firefox with a self-built model, so it is not shipped. Details in
+`research/synthid-removal.md` and `docs/spikes-v0.8.0-detect-regen.md`. Nothing here can verify
+that any invisible mark is gone, because there is no local detector.
+
+## Local models
+
+Models load **on demand**, only when you press the feature that needs one, never at page load.
+
+- Every file is served from this site (or, on the Cloudflare build, from our own R2 bucket),
+  pinned by SHA-256 in the source, and verified on every load, including from the cache. A
+  mismatch is refused and the model never runs.
+- Downloads show progress and can be cancelled. Files are cached in the browser, and **Delete
+  downloaded models** in the editor removes them.
+- Inference runs on the CPU in a Web Worker with onnxruntime-web. The model download is the only
+  network request the app ever makes, and it happens only after your click.
+- Model size is not a selection criterion. Quality and CPU speed decide.
+
+`docs/models.md` lists every hosted file with its hash, upstream revision and licence.
 
 ## What it can't do
 
@@ -176,6 +213,7 @@ This is metadata and provenance removal, not magic. It **cannot** guarantee remo
 
 - steganography hidden inside the pixel values themselves
 - invisible AI provenance watermarks (SynthID, Video Seal) and sensor noise fingerprints
+- it cannot certify that any invisible watermark is gone
 - visible watermarks
 - anything leaked by a compromised browser or operating system
 
@@ -196,6 +234,9 @@ npm run preview    # serve the production bundle on http://localhost:8888
 npm run build       # type-check + production bundle
 npm run build:wasm  # rebuild the Rust sanitize-core wasm (needs Rust + wasm-pack; output is committed)
 npm run fixtures    # regenerate the video test fixtures (needs ffmpeg)
+npm run models:fetch  # maintainer: fetch and verify the model files (add --push-r2 to upload to R2)
+npx playwright test --project=unit   # pure TypeScript unit tests (mask math, tiling, filters)
+WM_FLORENCE=1 npx playwright test tests/watermark.spec.ts -g Find   # release gate, downloads 275 MB
 npm run test:e2e    # zero-network + cross-engine determinism + the edit tools, Chromium and Firefox
 cargo test --manifest-path sanitize-core/Cargo.toml   # the core's own contract tests
 node scripts/copy-check.mjs   # house-style check: no em-dashes in the public copy
@@ -219,6 +260,12 @@ behaviour in [`docs/spikes-v0.7.0.md`](docs/spikes-v0.7.0.md).
 - **Stego-risk-reduction mode**: aggressive downscale, requantization, and stricter
   re-encode profiles to disrupt hidden payloads (reduces survivability; never a guarantee).
 - **Crop**: cut an edge that's leaking a sign, a timestamp, or a bystander.
+- **Regenerate (experimental)**: low-strength diffusion regeneration, the only local method with
+  evidence against SynthID, once a one-step model with TAESD as the decoder gets it under a few
+  minutes per image.
+- **Own small detector** (Apache-2.0) to replace the 275 MB Florence-2 download.
+- **Video watermark removal (v0.9.0)**: a mask from the frames that never change, reverse alpha
+  blending for semi-transparent overlays, small-crop inpaint for the rest.
 - **Multi-codec verification**: encode/decode through independent engines and fail on
   pixel-hash mismatches.
 - **Reproducible video mode**: a software encoder in WebAssembly for byte-identical output
@@ -240,7 +287,9 @@ rebuild, NAL and OBU filters) · WASM encoders
 ([`@jsquash/png`](https://github.com/jamsinclair/jSquash), `@jsquash/jpeg`, `@jsquash/webp`) ·
 [Mediabunny](https://mediabunny.dev) (MPL-2.0) for demux and mux on the video re-encode path,
 WebCodecs for decode and encode; the final bytes are always written and audited by the Rust
-core · Playwright for end-to-end tests in Chromium and Firefox.
+core · onnxruntime-web 1.30.0 (WASM backend) for MI-GAN (MIT), LaMa (Apache-2.0) and TAESD (MIT) ·
+Transformers.js 4.3.0 for Florence-2-base (MIT) · Playwright for end-to-end tests in Chromium and
+Firefox.
 
 ## License
 

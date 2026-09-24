@@ -1,16 +1,19 @@
 {
   "name": "stoptrackingme",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-ort.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-ort.mjs",
     "build": "tsc && vite build",
     "build:wasm": "RUSTFLAGS=\"-C target-feature=+simd128\" wasm-pack build sanitize-core --target web --out-dir ../src/wasm --out-name sanitize_core && rm -f src/wasm/.gitignore src/wasm/package.json",
     "fixtures": "node scripts/make-fixtures.mjs",
     "test:core": "cargo test --manifest-path sanitize-core/Cargo.toml",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "models:fetch": "node scripts/fetch-models.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
@@ -18,9 +21,11 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
+    "@huggingface/transformers": "4.3.0",
     "@jsquash/jpeg": "^1.6.0",
     "@jsquash/png": "^3.1.1",
     "@jsquash/webp": "^1.5.0",
-    "mediabunny": "1.59.1"
+    "mediabunny": "1.59.1",
+    "onnxruntime-web": "1.30.0"
   }
 }

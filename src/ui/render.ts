@@ -16,7 +16,14 @@ type VerdictStats = {
   audioKept?: boolean;
   durationS?: number;
   note?: string;
+  inpainted?: boolean;
+  reduced?: boolean;
 };
+
+const IMAGE_FILL_LIMITS =
+  "The fill is generated locally and can look soft on large areas. Invisible watermarks such as SynthID and the camera's noise pattern may still be present.";
+const IMAGE_REDUCE_LIMITS =
+  "Reduce hidden marks lowers what fragile invisible marks can survive. It does not remove SynthID, and the image may still be identifiable as processed.";
 
 const VIDEO_LIMITS =
   "Invisible watermarks such as Google SynthID, the camera's own noise pattern, and anything the video shows or says can still be in there.";
@@ -65,12 +72,20 @@ export function renderVerdict(
         : " Sound removed.";
       sub.textContent = `${lead} ${dims}${dur} · ${size}.${sound}${stats.note ? ` ${stats.note}` : ""}`;
     } else {
-      sub.textContent = `Metadata removed and output re-verified. ${dims} · ${size}.`;
+      const lead = stats.inpainted ? "Metadata removed, marked area filled, output re-verified." : "Metadata removed and output re-verified.";
+      sub.textContent = `${lead} ${dims} · ${size}.`;
     }
   } else {
     sub.textContent = error || "The output did not pass the strict audit, so download was blocked.";
   }
   body.appendChild(sub);
+
+  if (ok && stats?.media !== "video" && (stats?.inpainted || stats?.reduced)) {
+    const limits = document.createElement("p");
+    limits.className = "verdict-limits";
+    limits.textContent = [stats.inpainted ? IMAGE_FILL_LIMITS : "", stats.reduced ? IMAGE_REDUCE_LIMITS : ""].filter(Boolean).join(" ");
+    body.appendChild(limits);
+  }
 
   if (ok && stats?.media === "video") {
     const limits = document.createElement("p");

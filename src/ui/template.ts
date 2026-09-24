@@ -180,6 +180,46 @@ export function appMarkup(): string {
                 <p class="engine-note" id="engineNote"></p>
               </div>
 
+              <div class="adjust-field watermark-tools" id="watermarkTools">
+                <span class="field-label">Remove a watermark or overlay</span>
+                <div class="seg-row mask-tools" role="group" aria-label="Mask tools">
+                  <button type="button" class="seg is-active" id="maskBrush">Brush</button>
+                  <button type="button" class="seg" id="maskEraser">Eraser</button>
+                  <label class="mask-size"><span>Size</span><input id="maskSize" type="range" min="1" max="20" value="6" aria-label="Brush size" /></label>
+                  <button type="button" class="seg" id="maskClear">Clear</button>
+                </div>
+                <div class="seg-row" role="group" aria-label="Corner presets">
+                  <button type="button" class="seg" id="maskCornerTl">Top left</button>
+                  <button type="button" class="seg" id="maskCornerTr">Top right</button>
+                  <button type="button" class="seg" id="maskCornerBl">Bottom left</button>
+                  <button type="button" class="seg" id="maskCornerBr">Bottom right</button>
+                </div>
+                <p class="mask-state" id="maskState">Nothing marked</p>
+                <div class="seg-row" id="inpaintEngine" role="group" aria-label="Remover">
+                  <button type="button" class="seg is-active" data-engine="migan">Fast · 28 MB download</button>
+                  <button type="button" class="seg" data-engine="lama">High quality · 93 MB download</button>
+                </div>
+                <div class="mask-actions">
+                  <button type="button" class="ghost-btn" id="findWatermark">Find watermark · 275 MB model, about 30 s</button>
+                  <button type="button" class="ghost-btn" id="acceptProposals" hidden>Accept all</button>
+                  <button type="button" class="primary" id="removeBtn">${ICON.check}<span>Remove marked area</span></button>
+                </div>
+                <div class="model-progress" id="modelProgress" hidden>
+                  <div class="progress-track"><div class="progress-fill" id="modelProgressFill"></div></div>
+                  <p class="progress-detail" id="modelProgressText"></p>
+                  <button type="button" class="ghost-btn" id="modelCancel">${ICON.x}<span>Cancel download</span></button>
+                </div>
+                <label class="switch-row">
+                  <input id="reduceAi" type="checkbox" />
+                  <span class="switch" aria-hidden="true"></span>
+                  <span class="switch-text">
+                    <strong>Reduce hidden marks</strong>
+                    <small>Breaks fragile invisible marks such as the one older Stable Diffusion builds add. Does not remove SynthID. Not a guarantee.</small>
+                  </span>
+                </label>
+                <p class="model-store"><span id="modelStore">Downloaded models: none</span> <button type="button" class="link-btn" id="deleteModels">Delete downloaded models</button></p>
+              </div>
+
               <div class="adjust-field">
                 <span class="field-label">Resize</span>
                 <div class="seg-row" id="resizeChips" role="group" aria-label="Resize">
@@ -284,7 +324,11 @@ export function appMarkup(): string {
         </details>
         <details>
           <summary>Does this remove AI watermarks?</summary>
-          <p>No. This tool does not detect or remove AI watermarks such as Google SynthID, and it is not a way to hide that a video is AI-generated. Re-encoding reduces what fragile hidden patterns can survive, but that is never a guarantee.</p>
+          <p>It can reduce some. Reduce hidden marks runs a small local autoencoder round trip plus a resample and requantize, which defeats fragile marks such as the DWT-DCT scheme older Stable Diffusion builds used. It does not remove SynthID or similar robust marks, it cannot verify that anything is gone, and a processed image can itself be recognised as processed.</p>
+        </details>
+        <details>
+          <summary>How does Remove marked area work?</summary>
+          <p>You mark the watermark with the brush or a corner preset. A local inpainting model (MI-GAN, or LaMa for High quality) fills only the marked pixels, then the image goes through the same encode, strip and audit as any other. The models download once, after your click, are verified against a hash pinned in the source, and can be deleted from the editor.</p>
         </details>
       </div>
 
@@ -309,8 +353,9 @@ export function appMarkup(): string {
               </li>
               <li>
                 <strong>Break what hides in the pixels.</strong>
-                A heavy-clean mode that disrupts invisible watermarks, hidden messages and tracking
-                fingerprints, with a risk score so you know how exposed a photo really is.
+                Reduce hidden marks is the first step. Next is a regenerate mode strong enough for
+                robust marks, once it runs in minutes rather than an hour, with a risk score so you
+                know how exposed a photo really is.
               </li>
               <li>
                 <strong>Check the work twice.</strong>

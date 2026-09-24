@@ -45,3 +45,6 @@ scripts/_tmp*
 *.njsproj
 *.sln
 *.sw?
+
+public/ort/
+scripts/_models/
