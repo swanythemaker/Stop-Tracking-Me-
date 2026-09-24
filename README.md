@@ -94,6 +94,19 @@ reproducible with `node scripts/bench.mjs`.
 Animations are GPU-composited and respect `prefers-reduced-motion`, so the interface stays smooth
 without getting in the way.
 
+## Local models: size is not a constraint
+
+Any future feature that needs a machine-learning model (watermark detection, inpainting,
+video filters) loads that model **on demand**, only when the user picks the feature, and never at
+page load. The rule for this project:
+
+- Model size is not a selection criterion. An 800 MB local model is fine.
+- Models are fetched lazily, with a visible progress indicator, and cached locally
+  (Cache Storage or OPFS) so the download happens once.
+- Inference runs on the CPU in a Web Worker, fully local, so the no-network promise for the
+  image itself still holds. The model download is the only network request, and it is opt-in.
+- Pick models by quality and CPU speed, not by bundle size.
+
 ## What it can't do
 
 This is metadata and provenance removal, not magic. It **cannot** guarantee removal of:
