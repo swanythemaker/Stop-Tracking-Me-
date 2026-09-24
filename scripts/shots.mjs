@@ -5,7 +5,6 @@ const BASE = process.env.URL || "http://127.0.0.1:8890";
 const OUT = "screenshots";
 mkdirSync(OUT, { recursive: true });
 
-// Every target breakpoint from the spec. dpr 1 keeps the 4K PNGs a sane size.
 const VIEWPORTS = [
   { label: "mobile-portrait", width: 390, height: 844, mobile: true },
   { label: "mobile-landscape", width: 844, height: 390, mobile: true },
@@ -17,8 +16,6 @@ const VIEWPORTS = [
   { label: "uhd-4k", width: 3840, height: 2160, mobile: false },
 ];
 
-// A neutral test image with fake metadata cues, encoded as JPEG (carries a JFIF APP0 marker so
-// the input scan reports FAIL -> demonstrates the FAIL->clean story).
 async function makeTestImage(page) {
   const arr = await page.evaluate(async () => {
     const c = document.createElement("canvas");
@@ -64,22 +61,19 @@ async function shot(page, label, state, full = true) {
 async function runFlow(page, label) {
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.waitForSelector("#dropzone");
-  // Step 1, upload (step 2 shows as locked in the bar).
+
   await shot(page, label, "step1-empty");
 
   await uploadTestImage(page);
 
-  // Transition, the forced ~2.5s processing slide. Catch it mid-flight.
   await page.waitForTimeout(1100);
   await shot(page, label, "transition");
 
-  // Step 2, clean image (view mode).
   await page.waitForSelector("#downloadArea a", { timeout: 25000 });
   await page.waitForSelector(".verdict.ok");
-  await page.waitForTimeout(500); // let the carousel height settle
+  await page.waitForTimeout(500);
   await shot(page, label, "step2-result");
 
-  // Step 2, mini-editor open, with a resize applied (inline re-clean).
   await page.click("#editBtn");
   await page.waitForTimeout(250);
   await page.click('#resizeChips button[data-pct="75"]');
@@ -91,7 +85,7 @@ async function runFlow(page, label) {
 async function runError(page, label) {
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.waitForSelector("#dropzone");
-  // A PNG-typed file with garbage bytes, passes the MIME gate, fails to decode → fail-closed block.
+
   await page.setInputFiles("#fileInput", {
     name: "broken.png",
     mimeType: "image/png",

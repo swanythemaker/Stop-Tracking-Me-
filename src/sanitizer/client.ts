@@ -1,11 +1,7 @@
-// Promise-shaped wrapper around the sanitize Web Worker. The worker speaks a fire-and-forget
-// message protocol keyed by requestId; this turns each job into an awaitable call so the UI can
-// sequence transitions (e.g. enforce a minimum animation time) without juggling raw events.
 import type {
   AuditDone,
   SanitizeStage,
   WarmDone,
-  WorkerFailure,
   WorkerMessage,
   WorkerRequest,
   WorkerSuccess,
@@ -16,7 +12,7 @@ type Pending =
   | { kind: "audit"; resolve: (v: AuditDone) => void; reject: (e: Error) => void }
   | { kind: "warm"; resolve: (v: WarmDone) => void; reject: (e: Error) => void };
 
-export type ProgressFn = (stage: SanitizeStage, pct: number) => void;
+type ProgressFn = (stage: SanitizeStage, pct: number) => void;
 
 export class SanitizeClient {
   private worker: Worker;
@@ -32,7 +28,6 @@ export class SanitizeClient {
     );
   }
 
-  /** Run the full sanitize pipeline. Resolves on the clean output, rejects on a blocked/failed run. */
   sanitize(
     req: Omit<Extract<WorkerRequest, { kind: "sanitize" }>, "requestId" | "kind">,
     onProgress?: ProgressFn,
@@ -49,7 +44,6 @@ export class SanitizeClient {
     });
   }
 
-  /** Informational input scan. Never rejects in practice, the worker always returns a summary. */
   audit(
     req: Omit<Extract<WorkerRequest, { kind: "audit" }>, "requestId" | "kind">,
   ): Promise<AuditDone> {
@@ -65,7 +59,6 @@ export class SanitizeClient {
     });
   }
 
-  /** Pre-instantiate the wasm core off the critical path (call at idle). Safe to call once. */
   warm(): Promise<WarmDone> {
     const requestId = ++this.nextId;
     return new Promise<WarmDone>((resolve, reject) => {
@@ -95,12 +88,11 @@ export class SanitizeClient {
       return;
     }
 
-    // type === "done"
     if (p.kind !== "sanitize") return;
     if (msg.ok) {
       p.resolve(msg);
     } else {
-      p.reject(new Error((msg as WorkerFailure).error));
+      p.reject(new Error(msg.error));
     }
   }
 }

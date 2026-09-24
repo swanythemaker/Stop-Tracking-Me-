@@ -1,7 +1,3 @@
-/* Step bar, sliding carousel, the three slides (upload / processing / result), and the
-   inline mini-editor on the result slide. */
-
-/* ---------- step bar ---------- */
 .stepbar {
   padding: 4px 2px;
 }
@@ -19,8 +15,6 @@
   gap: 11px;
   padding: 6px 8px;
   border-radius: 12px;
-  background: none;
-  border: none;
   color: #cdd8cf;
   transition: color 160ms ease, opacity 160ms ease;
 }
@@ -79,7 +73,6 @@
   transition: width 520ms var(--ease-out);
 }
 
-/* --- step states --- */
 .step.is-active .step-dot {
   border-color: var(--accent);
   background: rgba(232, 64, 43, 0.16);
@@ -120,16 +113,12 @@
   color: #9fb2a6;
 }
 
-/* connector fills once the first step is complete */
 .step.is-done ~ .step-connector .connector-fill {
   width: 100%;
 }
 
-/* ---------- carousel (cross-fade, not a slider) ---------- */
 .carousel {
   position: relative;
-  /* `clip` + a small margin only lets the active panel's shadow bleed. Nothing sits beside
-     the active slide anymore (slides are stacked and cross-faded), so no neighbour can peek in. */
   overflow: clip;
   overflow-clip-margin: 28px;
   transition: height 340ms var(--ease-inout);
@@ -137,8 +126,7 @@
 .carousel-track {
   position: relative;
 }
-/* Each slide is its own screen: stacked in the same spot, faded in place. The active one is
-   in normal flow (so it alone drives the container height); the rest are taken out of flow. */
+
 .slide {
   position: absolute;
   top: 0;
@@ -147,8 +135,6 @@
   opacity: 0;
   visibility: hidden;
   transform: translateY(14px) scale(0.992);
-  /* Only opacity + transform animate (both composited); will-change keeps them on their own layer
-     so the cross-fade stays at 60fps without promoting everything permanently elsewhere. */
   will-change: opacity, transform;
   transition: opacity 240ms var(--ease-out), transform 300ms var(--ease-out),
     visibility 0s linear 300ms;
@@ -166,7 +152,6 @@
   outline: none;
 }
 
-/* ---------- slide 0: upload ---------- */
 .dropzone {
   position: relative;
   overflow: hidden;
@@ -183,7 +168,7 @@
   transition: border-color 180ms var(--ease-out), background 180ms var(--ease-out),
     transform 220ms var(--ease-spring), box-shadow 220ms var(--ease-out);
 }
-/* A slow sheen sweeps across, telling the eye this surface is live and droppable. */
+
 .dropzone::before {
   content: "";
   position: absolute;
@@ -297,7 +282,6 @@
   color: var(--fail);
 }
 
-/* ---------- slide 1: processing ---------- */
 .processing {
   display: flex;
   flex-direction: column;
@@ -350,7 +334,7 @@
   opacity: 0;
   background: rgba(8, 18, 13, 0.32);
 }
-/* Ring that bursts outward behind the ✓ the moment the audit passes. */
+
 .proc-check::after {
   content: "";
   position: absolute;
@@ -407,14 +391,12 @@
   color: var(--ink-soft);
 }
 
-/* ---------- slide 2: result (view + edit modes) ---------- */
 .result-stage {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-/* When the result slide arrives, its parts rise in sequence, verdict, then image, then actions , 
-   so the clean result feels revealed rather than dumped. Runs once per entry into the slide. */
+
 #slideResult.is-active .result-headline {
   animation: rise 460ms var(--ease-out) both;
 }
@@ -435,8 +417,6 @@
   color: var(--fail);
 }
 
-/* The clean output leads: full stage width, large. "Before" is demoted to a small
-   thumbnail underneath, a quick glance, not a co-star. */
 .result-canvas {
   display: flex;
   flex-direction: column;
@@ -464,7 +444,6 @@
   max-height: 220px;
 }
 
-/* view-mode actions */
 .result-actions {
   display: flex;
   flex-direction: column;
@@ -481,7 +460,6 @@
   flex: 1 1 auto;
 }
 
-/* edit-mode mini-editor */
 .editor {
   display: none;
   flex-direction: column;
@@ -608,7 +586,6 @@
   margin-top: 4px;
 }
 
-/* ---------- responsive ---------- */
 @media (max-width: 560px) {
   .step-label {
     font-size: 0.88rem;
@@ -624,9 +601,6 @@
   .step {
     gap: 8px;
     padding: 4px;
-  }
-  .result-canvas {
-    grid-template-columns: 1fr;
   }
   .advanced {
     grid-template-columns: 1fr;

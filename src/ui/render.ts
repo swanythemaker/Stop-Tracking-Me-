@@ -1,9 +1,8 @@
-// DOM renderers for the result surface. Each takes its target element so they hold no module state.
 import type { AuditSummary } from "../sanitizer/formats";
 import { ICON } from "./icons";
 import { formatBytes } from "./format";
 
-export type VerdictStats = {
+type VerdictStats = {
   inBytes: number;
   outBytes: number;
   width: number;

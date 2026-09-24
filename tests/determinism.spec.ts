@@ -2,10 +2,6 @@ import { chromium, expect, firefox, test, type Browser } from "@playwright/test"
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-// The headline v0.2 property: because decode + transforms run in OUR wasm (same module everywhere)
-// and the @jsquash encoders are the same wasm too, the cleaned output is byte-for-byte identical
-// across independent engines, something the old native-decode path could never guarantee.
-
 const BASE = "http://127.0.0.1:8890";
 
 async function makeInput(): Promise<Buffer> {
@@ -35,11 +31,9 @@ async function sanitizeHash(
   outputFormat: string,
 ): Promise<string> {
   const page = await browser.newPage();
-  // Skip the forced transition delay, exercises the real reduced-motion path, keeps the run fast.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(BASE);
 
-  // Dropping the file auto-runs the first sanitize (Ultra Paranoid → PNG).
   await page.setInputFiles("#fileInput", {
     name: "in.png",
     mimeType: "image/png",
@@ -57,19 +51,17 @@ async function sanitizeHash(
     });
     await page.locator("#outputFormat").selectOption(outputFormat);
   }
-  // Wait for the inline re-clean to settle on the requested container.
+
   const kind = outputFormat.replace("image/", "");
   await expect(page.locator("#outputReport")).toContainText(`kind: ${kind}`, {
     timeout: 30000,
   });
 
-  // Leave the mini-editor so the (view-mode) download button is visible/clickable again.
   if (await page.locator("#editDone").isVisible()) {
     await page.locator("#editDone").click();
     await page.locator("#downloadArea a").waitFor({ state: "visible", timeout: 10000 });
   }
 
-  // Read the cleaned bytes via the real download path (the prod CSP blocks fetch() of blob: URLs).
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.locator("#downloadArea a").click(),

@@ -24,7 +24,6 @@ app.innerHTML = appMarkup();
 
 const client = new SanitizeClient();
 
-// ---- element refs ----
 const fileInput = must<HTMLInputElement>("#fileInput");
 const dropzone = must<HTMLElement>("#dropzone");
 const fileCard = must<HTMLElement>("#fileCard");
@@ -57,7 +56,6 @@ const outputScanCard = must<HTMLElement>("#outputScanCard");
 const inputReport = must<HTMLElement>("#inputReport");
 const outputReport = must<HTMLElement>("#outputReport");
 
-// editor controls
 const outputFormat = must<HTMLSelectElement>("#outputFormat");
 const quality = must<HTMLInputElement>("#quality");
 const qualityValue = must<HTMLElement>("#qualityValue");
@@ -103,7 +101,6 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const MIN_TRANSITION_MS = 2500;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-// ---- state ----
 let selectedFile: File | null = null;
 let lastInputAudit: AuditSummary | null = null;
 let cleanedOnce = false;
@@ -115,7 +112,6 @@ let inputPreviewUrl: string | null = null;
 let outputPreviewUrl: string | null = null;
 let dragDepth = 0;
 
-// Adjust (edit tools) state, defaults are identity, so the one-drop-clean path is unchanged.
 let resizePct = 100;
 let customResize = false;
 let rotateDeg = 0;
@@ -125,7 +121,6 @@ let loadedDims: { w: number; h: number } | null = null;
 
 syncUltraParanoidUi();
 
-// ---- editor control wiring (each meaningful change schedules an inline re-clean) ----
 ultraParanoid.addEventListener("change", () => {
   syncUltraParanoidUi();
   scheduleReclean();
@@ -176,7 +171,6 @@ flipVBtn.addEventListener("click", () => {
   updateAdjust();
 });
 
-// ---- navigation wiring ----
 editBtn.addEventListener("click", () => flow.setEditing(true));
 editDone.addEventListener("click", () => flow.setEditing(false));
 newImageBtn.addEventListener("click", () => resetToUpload());
@@ -204,7 +198,6 @@ clearFile.addEventListener("click", async () => {
   await handleFileSelection(null);
 });
 
-// Full-window drag & drop overlay.
 window.addEventListener("dragenter", (event) => {
   if (!hasFiles(event)) return;
   event.preventDefault();
@@ -229,7 +222,6 @@ window.addEventListener("drop", async (event) => {
   if (file) await handleFileSelection(file);
 });
 
-// ---- file selection → input scan → auto-clean ----
 async function handleFileSelection(file: File | null): Promise<void> {
   clearDownload();
   selectedFile = null;
@@ -283,7 +275,6 @@ async function handleFileSelection(file: File | null): Promise<void> {
     updateDimReadout();
   });
 
-  // Informational input scan (same wasm audit the output gate uses).
   inputReport.textContent = "Scanning…";
   inputScanCard.innerHTML = "";
   setStatus("Scanning metadata…", "muted");
@@ -295,11 +286,9 @@ async function handleFileSelection(file: File | null): Promise<void> {
   inputReport.textContent = describeAudit(audit);
   renderScanCard(inputScanCard, audit, "Input scan");
 
-  // Auto-advance into the sanitize transition.
   await clean("first");
 }
 
-// ---- the sanitize run ----
 async function clean(mode: "first" | "reclean"): Promise<void> {
   if (!selectedFile || busy) {
     if (mode === "reclean") pendingReclean = true;
@@ -323,7 +312,6 @@ async function clean(mode: "first" | "reclean"): Promise<void> {
     const inputBuffer = await selectedFile.arrayBuffer();
     const res = await client.sanitize(
       {
-        sourceName: selectedFile.name,
         sourceType: selectedFile.type,
         inputBuffer,
         outputType:
@@ -345,7 +333,7 @@ async function clean(mode: "first" | "reclean"): Promise<void> {
       const elapsed = performance.now() - started;
       if (elapsed < minDelay) await wait(minDelay - elapsed);
       setProgress(100);
-      procFrame.classList.add("done"); // ✓ pop
+      procFrame.classList.add("done");
       if (!reducedMotion) await wait(420);
     }
 
@@ -426,7 +414,6 @@ function populateError(message: string): void {
   setStatus(info.status, "bad");
 }
 
-// ---- helpers ----
 function resetToUpload(): void {
   fileInput.value = "";
   void handleFileSelection(null);
@@ -587,10 +574,6 @@ function syncUltraParanoidUi(): void {
   }
 }
 
-// ---- warm the wasm core off the critical path ----
-// The worker instantiates the wasm lazily on first use; doing it at idle means the first real
-// drop skips cold-start (one-time ~tens of ms). Fire-and-forget; failures are harmless (the
-// first sanitize will just instantiate on demand as before).
 function warmCore(): void {
   void client.warm().catch(() => {});
 }
@@ -601,9 +584,6 @@ if (typeof ric === "function") {
   window.setTimeout(warmCore, 200);
 }
 
-// ---- benchmark hook (scripts/bench.mjs) ----
-// Runs the raw worker pipeline for a given buffer and returns the per-stage timing, with no UI
-// or forced-animation overhead. Lets the bench measure the actual decode/encode/strip cost.
 (window as unknown as { __sanitizeBench?: unknown }).__sanitizeBench = async (
   buffer: ArrayBuffer,
   sourceType: string,
@@ -612,7 +592,6 @@ if (typeof ric === "function") {
   resizePct = 100,
 ) => {
   const res = await client.sanitize({
-    sourceName: "bench",
     sourceType,
     inputBuffer: buffer,
     outputType,

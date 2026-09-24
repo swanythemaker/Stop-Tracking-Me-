@@ -29,7 +29,6 @@ test("sanitize flow does not make external network requests", async ({ page }) =
     return Array.from(new Uint8Array(await blob.arrayBuffer()));
   });
 
-  // Dropping the file auto-runs the scan + sanitize; the download link appears on success.
   tracking = true;
   await page.setInputFiles("#fileInput", {
     name: "test.png",

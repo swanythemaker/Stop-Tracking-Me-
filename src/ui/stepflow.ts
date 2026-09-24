@@ -1,8 +1,4 @@
-// Carousel + step-bar controller. Owns the "which slide is showing" presentation concern:
-// the sliding track, the animated container height, step-bar status, edit-mode morph, and a11y
-// inerting of off-screen slides. The flow logic (when to advance) lives in main.ts.
-
-export type Slide = 0 | 1 | 2; // 0 upload · 1 processing · 2 result
+type Slide = 0 | 1 | 2;
 
 export class StepFlow {
   private carousel: HTMLElement;
@@ -12,7 +8,6 @@ export class StepFlow {
   private resultStage: HTMLElement;
   private ro: ResizeObserver;
   private current: Slide = 0;
-  private editing = false;
 
   constructor(els: {
     carousel: HTMLElement;
@@ -27,10 +22,6 @@ export class StepFlow {
     this.stepClean = els.stepClean;
     this.resultStage = els.resultStage;
 
-    // Keep the container height glued to the active slide as its content reflows
-    // (edit toggle, re-clean swapping a taller/shorter image, font load, etc.).
-    // We only ever measure the active slide, so only observe the active slide , 
-    // observing the two off-screen ones just fired redundant callbacks.
     this.ro = new ResizeObserver(() => this.syncHeight());
     window.addEventListener("resize", () => this.syncHeight());
 
@@ -43,42 +34,29 @@ export class StepFlow {
 
   goTo(slide: Slide, opts: { focus?: boolean } = {}): void {
     this.current = slide;
-    if (slide !== 2) this.editing = false;
     this.apply(opts.focus ?? false);
   }
 
   setEditing(on: boolean): void {
-    this.editing = on;
     this.resultStage.classList.toggle("is-editing", on);
     this.syncHeight();
   }
 
-  get isEditing(): boolean {
-    return this.editing;
-  }
-
-  /** Recompute the container height to match the active slide. */
   syncHeight(): void {
     const active = this.slides[this.current];
     if (active) this.carousel.style.height = `${active.offsetHeight}px`;
   }
 
   private apply(focus: boolean): void {
-    // Slides cross-fade in place (see stepflow.css), no track translation here anymore.
-
-    // Landing (upload slide) shows the full hero + page; once we're working the hero
-    // collapses to a sticky bar and the marketing/docs weight drops out of layout.
     document.body.dataset.mode = this.current === 0 ? "landing" : "working";
 
     this.slides.forEach((s, i) => {
       const active = i === this.current;
       s.classList.toggle("is-active", active);
-      // `inert` keeps off-screen slides out of tab order + a11y tree without display:none.
       if (active) s.removeAttribute("inert");
       else s.setAttribute("inert", "");
     });
 
-    // Re-point the height observer at the (single) active slide.
     this.ro.disconnect();
     this.ro.observe(this.slides[this.current]);
 
@@ -96,14 +74,12 @@ export class StepFlow {
     const cleaned = this.current === 2;
     const inFlight = this.current === 1;
 
-    // Step 1 (Upload): active on slide 0, done once we've moved past it.
     this.setStep(this.stepUpload, {
       active: this.current === 0,
       done: this.current > 0,
       locked: false,
     });
 
-    // Step 2 (Clean image): locked until we leave upload; active while processing/result.
     this.setStep(this.stepClean, {
       active: inFlight || cleaned,
       done: cleaned,

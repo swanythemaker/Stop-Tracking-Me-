@@ -1,9 +1,3 @@
-//! Decode bytes → upright RGBA8, under our control (not the browser's native decoders).
-//!
-//! Order matters: guard dimensions from the header before allocating, reject animation (paranoid),
-//! read EXIF orientation, decode, then bake orientation into pixels so the tag can be dropped without
-//! the image coming out sideways. The single most likely regression from owning decode — tested.
-
 use crate::{container, guard, transform};
 use image::{ImageFormat, RgbaImage};
 use std::io::Cursor;
@@ -14,7 +8,6 @@ fn decode_err() -> String {
 }
 
 pub fn decode_upright(b: &[u8]) -> Result<RgbaImage, String> {
-    // 1. Dimensions from the header only → guard before a full-frame allocation.
     let reader = image::ImageReader::new(Cursor::new(b))
         .with_guessed_format()
         .map_err(|_| decode_err())?;
@@ -22,17 +15,13 @@ pub fn decode_upright(b: &[u8]) -> Result<RgbaImage, String> {
     let (w, h) = reader.into_dimensions().map_err(|_| decode_err())?;
     guard::check_dimensions(w, h)?;
 
-    // 2. Reject animation (consistent with strip refusing ANIM/ANMF).
     reject_animation(b, format)?;
 
-    // 3. Orientation must be read BEFORE we drop the metadata.
     let orientation = read_orientation(b);
 
-    // 4. Full decode to RGBA8.
     let dynimg = image::load_from_memory(b).map_err(|_| decode_err())?;
     let rgba = dynimg.to_rgba8();
 
-    // 5. Bake EXIF orientation into the pixels.
     Ok(transform::bake_orientation(rgba, orientation))
 }
 

@@ -6,8 +6,6 @@ const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 );
 
-// Commit hash: Vercel injects VERCEL_GIT_COMMIT_SHA at build time; fall back to
-// the local git checkout, then to "local" when neither is available.
 const commit =
   process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
   (() => {

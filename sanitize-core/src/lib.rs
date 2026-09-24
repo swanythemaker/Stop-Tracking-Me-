@@ -1,9 +1,3 @@
-//! sanitize-core — the deterministic, fuzzable half of STOPTRACKINGME's pipeline.
-//!
-//! Owns decode → pixel transforms → strip → audit. Encode stays in @jsquash on the JS side, so the
-//! worker calls this twice: `decode_and_transform` (bytes → RGBA), then JS encodes, then
-//! `strip_and_audit` (encoded bytes → clean bytes + verdict). One allowlist drives strip and audit.
-
 pub mod allowlist;
 pub mod audit;
 pub mod container;
@@ -18,22 +12,12 @@ use wasm_bindgen::prelude::*;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TransformOpts {
-    #[serde(default = "default_resize_pct")]
     resize_pct: u32,
-    #[serde(default)]
     rotate: i32,
-    #[serde(default)]
     flip_h: bool,
-    #[serde(default)]
     flip_v: bool,
 }
 
-fn default_resize_pct() -> u32 {
-    100
-}
-
-/// Result of `decode_and_transform`: read dims (cheap getters) first, then `take_rgba()` last — it
-/// moves the pixel buffer out to avoid copying a full frame.
 #[wasm_bindgen]
 pub struct DecodeResult {
     rgba: Vec<u8>,
@@ -61,7 +45,7 @@ impl DecodeResult {
     pub fn orig_height(&self) -> u32 {
         self.orig_height
     }
-    /// Moves the RGBA8 buffer out (consumes the result). Call after reading the dimensions.
+
     #[wasm_bindgen(js_name = takeRgba)]
     pub fn take_rgba(self) -> Vec<u8> {
         self.rgba
@@ -91,7 +75,6 @@ impl StripAuditResult {
     }
 }
 
-/// Decode `input` to upright RGBA8, then apply user transforms (flip → rotate → resize).
 #[wasm_bindgen(js_name = decodeAndTransform)]
 pub fn decode_and_transform(input: &[u8], opts_json: &str) -> Result<DecodeResult, JsError> {
     let opts: TransformOpts =
@@ -113,8 +96,6 @@ pub fn decode_and_transform(input: &[u8], opts_json: &str) -> Result<DecodeResul
     Ok(DecodeResult { rgba: img.into_raw(), width, height, orig_width, orig_height })
 }
 
-/// Strip the re-encoded bytes to the allowlist, then audit the result with the SAME allowlist.
-/// `format` is the MIME of the encoded bytes (`image/png` | `image/jpeg` | `image/webp`).
 #[wasm_bindgen(js_name = stripAndAudit)]
 pub fn strip_and_audit(encoded: &[u8], format: &str) -> Result<StripAuditResult, JsError> {
     let bytes = strip::strip(format, encoded).map_err(|e| JsError::new(&e))?;
@@ -124,8 +105,6 @@ pub fn strip_and_audit(encoded: &[u8], format: &str) -> Result<StripAuditResult,
     Ok(StripAuditResult { bytes, audit_json, passed })
 }
 
-/// Audit arbitrary image bytes (format auto-detected). Used for the informational input scan, so
-/// input and output verdicts come from the exact same code.
 #[wasm_bindgen(js_name = auditBytes)]
 pub fn audit_bytes(input: &[u8]) -> String {
     let summary = audit::audit_auto(input);

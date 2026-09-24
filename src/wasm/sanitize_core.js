@@ -1,9 +1,3 @@
-/* @ts-self-types="./sanitize_core.d.ts" */
-
-/**
- * Result of `decode_and_transform`: read dims (cheap getters) first, then `take_rgba()` last — it
- * moves the pixel buffer out to avoid copying a full frame.
- */
 export class DecodeResult {
     static __wrap(ptr) {
         const obj = Object.create(DecodeResult.prototype);
@@ -21,31 +15,18 @@ export class DecodeResult {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_decoderesult_free(ptr, 0);
     }
-    /**
-     * @returns {number}
-     */
     get height() {
         const ret = wasm.decoderesult_height(this.__wbg_ptr);
         return ret >>> 0;
     }
-    /**
-     * @returns {number}
-     */
     get origHeight() {
         const ret = wasm.decoderesult_origHeight(this.__wbg_ptr);
         return ret >>> 0;
     }
-    /**
-     * @returns {number}
-     */
     get origWidth() {
         const ret = wasm.decoderesult_origWidth(this.__wbg_ptr);
         return ret >>> 0;
     }
-    /**
-     * Moves the RGBA8 buffer out (consumes the result). Call after reading the dimensions.
-     * @returns {Uint8Array}
-     */
     takeRgba() {
         try {
             const ptr = this.__destroy_into_raw();
@@ -60,9 +41,6 @@ export class DecodeResult {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
     }
-    /**
-     * @returns {number}
-     */
     get width() {
         const ret = wasm.decoderesult_width(this.__wbg_ptr);
         return ret >>> 0;
@@ -87,9 +65,6 @@ export class StripAuditResult {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_stripauditresult_free(ptr, 0);
     }
-    /**
-     * @returns {string}
-     */
     get auditJson() {
         let deferred1_0;
         let deferred1_1;
@@ -106,16 +81,10 @@ export class StripAuditResult {
             wasm.__wbindgen_export2(deferred1_0, deferred1_1, 1);
         }
     }
-    /**
-     * @returns {boolean}
-     */
     get passed() {
         const ret = wasm.stripauditresult_passed(this.__wbg_ptr);
         return ret !== 0;
     }
-    /**
-     * @returns {Uint8Array}
-     */
     takeBytes() {
         try {
             const ptr = this.__destroy_into_raw();
@@ -133,12 +102,6 @@ export class StripAuditResult {
 }
 if (Symbol.dispose) StripAuditResult.prototype[Symbol.dispose] = StripAuditResult.prototype.free;
 
-/**
- * Audit arbitrary image bytes (format auto-detected). Used for the informational input scan, so
- * input and output verdicts come from the exact same code.
- * @param {Uint8Array} input
- * @returns {string}
- */
 export function auditBytes(input) {
     let deferred2_0;
     let deferred2_1;
@@ -158,12 +121,6 @@ export function auditBytes(input) {
     }
 }
 
-/**
- * Decode `input` to upright RGBA8, then apply user transforms (flip → rotate → resize).
- * @param {Uint8Array} input
- * @param {string} opts_json
- * @returns {DecodeResult}
- */
 export function decodeAndTransform(input, opts_json) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
@@ -184,13 +141,6 @@ export function decodeAndTransform(input, opts_json) {
     }
 }
 
-/**
- * Strip the re-encoded bytes to the allowlist, then audit the result with the SAME allowlist.
- * `format` is the MIME of the encoded bytes (`image/png` | `image/jpeg` | `image/webp`).
- * @param {Uint8Array} encoded
- * @param {string} format
- * @returns {StripAuditResult}
- */
 export function stripAndAudit(encoded, format) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
@@ -408,7 +358,6 @@ async function __wbg_load(module, imports) {
 function initSync(module) {
     if (wasm !== undefined) return wasm;
 
-
     if (module !== undefined) {
         if (Object.getPrototypeOf(module) === Object.prototype) {
             ({module} = module)
@@ -427,7 +376,6 @@ function initSync(module) {
 
 async function __wbg_init(module_or_path) {
     if (wasm !== undefined) return wasm;
-
 
     if (module_or_path !== undefined) {
         if (Object.getPrototypeOf(module_or_path) === Object.prototype) {

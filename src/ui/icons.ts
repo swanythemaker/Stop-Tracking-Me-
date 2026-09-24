@@ -1,5 +1,3 @@
-// Inline SVG icon set, shared across the template and the DOM renderers.
-// Stroke uses currentColor so each icon inherits the colour of its context.
 export const ICON = {
   shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.5v5.4c0 4.5 3.1 8.7 7.5 10.1 4.4-1.4 7.5-5.6 7.5-10.1V5.5L12 2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg>`,
   upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 16v2.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>`,

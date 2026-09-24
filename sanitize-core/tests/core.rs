@@ -1,11 +1,6 @@
-//! Contract tests for sanitize-core (host/native; fast). Fixtures are synthesized with `image`'s
-//! encoders (test-only) so there are no checked-in binaries to drift.
-
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 use sanitize_core::{allowlist, audit, container, decode, guard, strip, transform};
 use std::io::Cursor;
-
-// ---- fixtures -------------------------------------------------------------------------------
 
 fn sample(w: u32, h: u32) -> RgbaImage {
     RgbaImage::from_fn(w, h, |x, y| {
@@ -20,8 +15,6 @@ fn encode(img: &RgbaImage, fmt: ImageFormat) -> Vec<u8> {
         .expect("encode fixture");
     buf.into_inner()
 }
-
-// ---- THE core invariant: strip output passes audit, every format ----------------------------
 
 #[test]
 fn stripped_output_passes_audit_png() {
@@ -56,17 +49,15 @@ fn strip_is_idempotent_png() {
     assert_eq!(once, twice, "stripping a clean file must be a no-op");
 }
 
-// ---- metadata removal -----------------------------------------------------------------------
-
 #[test]
 fn audit_flags_injected_png_text_chunk() {
     let mut bytes = encode(&sample(16, 16), ImageFormat::Png);
     inject_png_text(&mut bytes);
-    // Audit of the dirty input must FAIL...
+
     let dirty = audit::audit("image/png", &bytes);
     assert!(!dirty.passed);
     assert!(dirty.issues.iter().any(|i| i.contains("tEXt")));
-    // ...and strip must remove it so the output passes.
+
     let stripped = strip::strip("image/png", &bytes).expect("strip dirty png");
     assert!(audit::audit("image/png", &stripped).passed);
     assert!(!contains(&stripped, b"tEXt"));
@@ -74,7 +65,6 @@ fn audit_flags_injected_png_text_chunk() {
 
 #[test]
 fn audit_flags_jpeg_app_marker() {
-    // image's JPEG encoder writes a JFIF APP0; the raw input audit should flag it, strip removes it.
     let bytes = encode(&sample(16, 16), ImageFormat::Jpeg);
     let raw = audit::audit("image/jpeg", &bytes);
     if raw.markers.iter().any(|m| m.starts_with("APP")) {
@@ -85,8 +75,6 @@ fn audit_flags_jpeg_app_marker() {
     assert!(out.passed);
     assert!(!out.markers.iter().any(|m| m.starts_with("APP")));
 }
-
-// ---- fail-closed on malformed (never panic) -------------------------------------------------
 
 #[test]
 fn malformed_never_panics_and_fails_closed() {
@@ -101,17 +89,12 @@ fn malformed_never_panics_and_fails_closed() {
         ("jpeg-soi-only", vec![0xff, 0xd8]),
         ("riff-only", b"RIFF\0\0\0\0WEBP".to_vec()),
     ];
-    // Truncations of valid files.
-    for (name, good, fmt) in [
-        ("png", &good_png, "image/png"),
-        ("jpeg", &good_jpeg, "image/jpeg"),
-        ("webp", &good_webp, "image/webp"),
-    ] {
+
+    for (name, good) in [("png", &good_png), ("jpeg", &good_jpeg), ("webp", &good_webp)] {
         for cut in [good.len() / 3, good.len() / 2, good.len().saturating_sub(3)] {
             corpus.push((name, good[..cut].to_vec()));
-            let _ = fmt; // format derived per-name below
         }
-        // Single-byte flips through the header region.
+
         for i in (8..good.len().min(80)).step_by(7) {
             let mut m = good.clone();
             m[i] ^= 0xff;
@@ -126,17 +109,14 @@ fn malformed_never_panics_and_fails_closed() {
             "webp" | "riff-only" => "image/webp",
             _ => "image/png",
         };
-        // audit must never panic, returns a verdict.
-        let verdict = audit::audit(fmt, bytes);
-        // strip either errors or yields bytes that re-audit cleanly (fail-closed both ways).
-        match strip::strip(fmt, bytes) {
-            Ok(out) => assert!(
+
+        audit::audit(fmt, bytes);
+        if let Ok(out) = strip::strip(fmt, bytes) {
+            assert!(
                 audit::audit(fmt, &out).passed,
                 "{name}: strip produced output that fails audit"
-            ),
-            Err(_) => { /* refused — fine */ }
+            );
         }
-        let _ = verdict;
     }
 }
 
@@ -151,19 +131,13 @@ fn trailing_bytes_after_png_iend_rejected() {
 #[test]
 fn png_crc_corruption_rejected() {
     let mut bytes = encode(&sample(10, 10), ImageFormat::Png);
-    // Flip a byte inside the first IDAT data region (after the 8-byte sig + IHDR(25) header area).
     let idx = bytes.len() / 2;
     bytes[idx] ^= 0x80;
-    // Strip refuses on CRC mismatch (fail-closed).
-    let stripped = strip::strip("image/png", &bytes);
-    if let Ok(out) = stripped {
+
+    if let Ok(out) = strip::strip("image/png", &bytes) {
         assert!(audit::audit("image/png", &out).passed);
-    } else {
-        // refused — also acceptable and expected for a CRC break
     }
 }
-
-// ---- decode + transforms --------------------------------------------------------------------
 
 #[test]
 fn decode_roundtrips_dimensions() {
@@ -175,7 +149,7 @@ fn decode_roundtrips_dimensions() {
 #[test]
 fn orientation_bake_rotate90_swaps_dims() {
     let img = sample(8, 4);
-    let baked = transform::bake_orientation(img, 6); // rotate 90 CW
+    let baked = transform::bake_orientation(img, 6);
     assert_eq!(baked.dimensions(), (4, 8));
 }
 
@@ -184,7 +158,7 @@ fn orientation_bake_fliph_mirrors_pixels() {
     let img = sample(4, 1);
     let left = *img.get_pixel(0, 0);
     let right = *img.get_pixel(3, 0);
-    let baked = transform::bake_orientation(img, 2); // mirror horizontal
+    let baked = transform::bake_orientation(img, 2);
     assert_eq!(*baked.get_pixel(0, 0), right);
     assert_eq!(*baked.get_pixel(3, 0), left);
 }
@@ -204,7 +178,7 @@ fn resize_is_deterministic_and_scales() {
     let b = transform::resize(img.clone(), 50);
     assert_eq!(a.dimensions(), (50, 30));
     assert_eq!(a.into_raw(), b.into_raw(), "resize must be deterministic");
-    // 100% is an exact no-op.
+
     let same = transform::resize(img.clone(), 100);
     assert_eq!(same.into_raw(), img.into_raw());
 }
@@ -212,37 +186,31 @@ fn resize_is_deterministic_and_scales() {
 #[test]
 fn resize_never_upscales_and_keeps_min_1px() {
     let img = sample(3, 3);
-    let r = transform::resize(img, 10); // 0.3px -> clamped to 1px
+    let r = transform::resize(img, 10);
     let (w, h) = r.dimensions();
     assert!(w >= 1 && h >= 1);
 }
-
-// ---- guard ----------------------------------------------------------------------------------
 
 #[test]
 fn guard_rejects_oversize() {
     assert!(guard::check_dimensions(20000, 10).is_err());
     assert!(guard::check_dimensions(10, 20000).is_err());
-    assert!(guard::check_dimensions(12000, 12000).is_err()); // 144 MP > 100 MP
+    assert!(guard::check_dimensions(12000, 12000).is_err());
     assert!(guard::check_dimensions(1920, 1080).is_ok());
 }
-
-// ---- helpers --------------------------------------------------------------------------------
 
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
 }
 
-/// Insert a `tEXt` chunk right after the PNG signature + IHDR so it lands before IDAT.
 fn inject_png_text(bytes: &mut Vec<u8>) {
-    // IHDR is always the first chunk: 8 (sig) + 4 (len) + 4 (type) + 13 (data) + 4 (crc) = 33.
     let insert_at = 33;
-    let payload = b"Comment\0hello-tracker"; // keyword\0text
+    let payload = b"Comment\0hello-tracker";
     let mut chunk = Vec::new();
     chunk.extend_from_slice(&(payload.len() as u32).to_be_bytes());
     chunk.extend_from_slice(b"tEXt");
     chunk.extend_from_slice(payload);
-    let crc = container::crc32(&chunk[4..]); // over type+data
+    let crc = container::crc32(&chunk[4..]);
     chunk.extend_from_slice(&crc.to_be_bytes());
     bytes.splice(insert_at..insert_at, chunk);
 }

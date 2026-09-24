@@ -1,7 +1,3 @@
-//! Strip-to-allowlist. Rebuilds a container keeping only `allowlist`-approved chunks/markers.
-//! Fails closed (returns `Err`) on any structural problem so a malformed re-encode can never slip
-//! through. Mirrors the old `normalize.ts`, but reads the *same* allowlist the audit reads.
-
 use crate::allowlist;
 use crate::container::{self, JpegItem};
 
@@ -94,7 +90,7 @@ fn strip_jpeg(b: &[u8]) -> Result<Vec<u8>, String> {
     }
 
     let mut out = Vec::with_capacity(b.len());
-    out.extend_from_slice(&[0xff, 0xd8]); // SOI
+    out.extend_from_slice(&[0xff, 0xd8]);
     for item in &walk.items {
         match *item {
             JpegItem::Standalone(m) => out.extend_from_slice(&[0xff, m]),
@@ -108,7 +104,7 @@ fn strip_jpeg(b: &[u8]) -> Result<Vec<u8>, String> {
             JpegItem::Scan { hdr_start, hdr_end, eoi } => {
                 out.extend_from_slice(&[0xff, 0xda]);
                 out.extend_from_slice(&b[hdr_start..hdr_end]);
-                out.extend_from_slice(&b[hdr_end..eoi + 2]); // entropy data + EOI
+                out.extend_from_slice(&b[hdr_end..eoi + 2]);
             }
         }
     }
@@ -120,7 +116,6 @@ fn cleanse_vp8x(data: &[u8]) -> Result<Vec<u8>, String> {
         return Err("Invalid VP8X chunk length".to_string());
     }
     let mut clean = data.to_vec();
-    // Clear the metadata/animation flag bits audit refuses (0xC0 reserved/unused-as-set + 0x02 anim).
     clean[0] &= 0b0011_1101;
     Ok(clean)
 }

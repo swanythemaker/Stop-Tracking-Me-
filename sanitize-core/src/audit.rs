@@ -1,15 +1,11 @@
-//! Output (and input) audit. Re-scans bytes and decides PASS/FAIL using the SAME walkers and the
-//! SAME allowlist that `strip` uses, so a stripped file provably passes (see tests). Serialized to
-//! JSON for the JS layer; the shape matches the v0.1 `AuditSummary` the UI already renders.
-
 use crate::allowlist;
 use crate::container::{self, JpegItem};
 use serde::Serialize;
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditSummary {
-    pub kind: String, // "png" | "jpeg" | "webp" | "unknown"
+    pub kind: String,
     pub issues: Vec<String>,
     pub markers: Vec<String>,
     pub byte_length: usize,
@@ -22,7 +18,6 @@ impl AuditSummary {
     }
 }
 
-/// Audit by explicit format hint, falling back to signature sniffing (matches v1 `auditBytes`).
 pub fn audit(format: &str, b: &[u8]) -> AuditSummary {
     if format == "image/png" || container::has_png_signature(b) {
         return audit_png(b);
@@ -36,7 +31,6 @@ pub fn audit(format: &str, b: &[u8]) -> AuditSummary {
     AuditSummary::fail("unknown", b.len(), Vec::new(), "Unknown image structure")
 }
 
-/// Auto-detect format and audit (used for the input scan card).
 pub fn audit_auto(b: &[u8]) -> AuditSummary {
     audit("", b)
 }

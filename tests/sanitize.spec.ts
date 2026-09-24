@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Build a deterministic test image of the given mime, in-page, and return its bytes.
 async function makeImage(page: Page, mime: string, w = 48, h = 32): Promise<Buffer> {
   const arr = await page.evaluate(
     async ({ mime, w, h }) => {
@@ -14,7 +13,7 @@ async function makeImage(page: Page, mime: string, w = 48, h = 32): Promise<Buff
       x.fillStyle = g;
       x.fillRect(0, 0, w, h);
       x.fillStyle = "#fff";
-      x.fillRect(2, 2, 6, 6); // an asymmetric mark so rotation/flip is observable
+      x.fillRect(2, 2, 6, 6);
       const blob = await new Promise<Blob>((res) =>
         c.toBlob((b) => res(b!), mime, 0.9),
       );
@@ -25,21 +24,17 @@ async function makeImage(page: Page, mime: string, w = 48, h = 32): Promise<Buff
   return Buffer.from(arr);
 }
 
-// Dropping a file auto-runs the input scan + first sanitize (the carousel transition), then lands
-// on the result slide. No Sanitize button, the upload itself drives the flow.
 async function uploadAndClean(page: Page, name: string, mime: string, buffer: Buffer) {
   await page.setInputFiles("#fileInput", { name, mimeType: mime, buffer });
   await expect(page.locator("#downloadArea a")).toBeVisible({ timeout: 25000 });
   await expect(page.locator(".verdict.ok")).toBeVisible();
 }
 
-// Adjust controls (resize/rotate/flip, format, quality) live in the inline mini-editor on step 2.
 async function enterEdit(page: Page) {
   await page.locator("#editBtn").click();
   await expect(page.locator("#editor")).toBeVisible();
 }
 
-// The Ultra Paranoid checkbox is a styled switch (hidden input), so toggle it in the DOM.
 async function setUltra(page: Page, on: boolean) {
   await page.evaluate((want) => {
     const cb = document.querySelector<HTMLInputElement>("#ultraParanoid")!;
@@ -74,11 +69,10 @@ for (const { mime, ext, kind } of [
     const buf = await makeImage(page, mime);
     await uploadAndClean(page, `in.${ext}`, mime, buf);
 
-    // Re-encode to this format (turn off Ultra Paranoid, which forces PNG) via the mini-editor.
     await enterEdit(page);
     await setUltra(page, false);
     await page.locator("#outputFormat").selectOption(mime);
-    // The output scan report names the container kind once the inline re-clean completes.
+
     await expect(page.locator("#outputReport")).toContainText(`kind: ${kind}`, {
       timeout: 25000,
     });
@@ -121,7 +115,6 @@ test("rotate 90° swaps the output dimensions", async ({ page }) => {
 });
 
 test("oversized inputs are still rejected (guard in wasm)", async ({ page }) => {
-  // 17000px exceeds the 16384px guard; build a tall 1px-wide PNG to stay light.
   const buf = await makeImage(page, "image/png", 17000, 1);
   await page.setInputFiles("#fileInput", {
     name: "tall.png",

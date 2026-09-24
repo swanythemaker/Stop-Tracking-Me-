@@ -8,8 +8,6 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:8890",
     headless: true,
-    // Tests exercise the real reduced-motion code path, which skips the forced ~2.5s
-    // transition delay so the suite stays fast.
     reducedMotion: "reduce",
   },
   webServer: {

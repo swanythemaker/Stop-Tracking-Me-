@@ -1,5 +1,3 @@
-/// <reference lib="webworker" />
-
 import init, {
   decodeAndTransform,
   stripAndAudit,
@@ -18,17 +16,23 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "./types";
-// Import the encoder entry points directly (not the package index) so the jsquash *decoder* wasms
-// are never referenced, decode is now ours, in sanitize-core. Drops ~300 KB of dead codec wasm.
+
 import encodeJpeg from "@jsquash/jpeg/encode";
 import encodePng from "@jsquash/png/encode";
 import encodeWebp from "@jsquash/webp/encode";
 
-// Byte-size guardrail stays in TS at the worker boundary (cheap, pre-wasm). Dimension/pixel limits
-// live in the wasm `guard` module (they need the decoded header).
 const MAX_INPUT_BYTES = 64 * 1024 * 1024;
 
-// The wasm module is loaded once, lazily, on the first job (keeps first-paint cost off the bundle).
+interface WorkerScope {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(
+    type: "message",
+    listener: (event: MessageEvent<WorkerRequest>) => void | Promise<void>,
+  ): void;
+}
+
+const scope = self as unknown as WorkerScope;
+
 let wasmReady: Promise<unknown> | null = null;
 function ensureWasm(): Promise<unknown> {
   if (!wasmReady) {
@@ -37,11 +41,11 @@ function ensureWasm(): Promise<unknown> {
   return wasmReady;
 }
 
-self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
+scope.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
   const payload = event.data;
   if (payload.kind === "warm") {
     await ensureWasm();
-    self.postMessage({ type: "warm-done", requestId: payload.requestId });
+    scope.postMessage({ type: "warm-done", requestId: payload.requestId });
     return;
   }
   if (payload.kind === "audit") {
@@ -50,7 +54,7 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
   }
   try {
     const result = await sanitize(payload);
-    self.postMessage(result, [result.outputBuffer]);
+    scope.postMessage(result, [result.outputBuffer]);
   } catch (error) {
     const response: WorkerResponse = {
       type: "done",
@@ -58,7 +62,7 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
       requestId: payload.requestId,
       error: error instanceof Error ? error.message : "Unknown worker error",
     };
-    self.postMessage(response);
+    scope.postMessage(response);
   }
 });
 
@@ -67,9 +71,8 @@ async function handleAudit(request: AuditRequest): Promise<void> {
     await ensureWasm();
     const json = auditBytes(new Uint8Array(request.inputBuffer));
     const audit = JSON.parse(json) as AuditSummary;
-    self.postMessage({ type: "audit-done", requestId: request.requestId, audit });
+    scope.postMessage({ type: "audit-done", requestId: request.requestId, audit });
   } catch {
-    // Input audit is purely informational; failure here must not break the UI.
     const audit: AuditSummary = {
       kind: "unknown",
       issues: ["Could not scan this file."],
@@ -77,13 +80,13 @@ async function handleAudit(request: AuditRequest): Promise<void> {
       byteLength: request.inputBuffer.byteLength,
       passed: false,
     };
-    self.postMessage({ type: "audit-done", requestId: request.requestId, audit });
+    scope.postMessage({ type: "audit-done", requestId: request.requestId, audit });
   }
 }
 
 function report(requestId: number, stage: SanitizeStage, pct: number): void {
   const progress: WorkerProgress = { type: "progress", requestId, stage, pct };
-  self.postMessage(progress);
+  scope.postMessage(progress);
 }
 
 async function sanitize(
@@ -114,13 +117,12 @@ async function sanitize(
   await ensureWasm();
   const tStart = performance.now();
 
-  // 1. Decode + pixel transforms in our deterministic wasm (replaces native createImageBitmap).
   report(request.requestId, "decode", 25);
   const opts = JSON.stringify({
     resizePct: clampPct(request.resizePct),
-    rotate: request.rotate ?? 0,
-    flipH: Boolean(request.flipH),
-    flipV: Boolean(request.flipV),
+    rotate: request.rotate,
+    flipH: request.flipH,
+    flipV: request.flipV,
   });
   const decoded = decodeAndTransform(new Uint8Array(request.inputBuffer), opts);
   const width = decoded.width;
@@ -131,7 +133,6 @@ async function sanitize(
   const imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
   const tDecoded = performance.now();
 
-  // 2. Re-encode a fresh file via the @jsquash encoders (unchanged trust boundary).
   report(request.requestId, "encode", 55);
   const encoded = await encodeWithWasm(
     outputType,
@@ -140,7 +141,6 @@ async function sanitize(
   );
   const tEncoded = performance.now();
 
-  // 3. Strip-to-allowlist + 4. fail-closed audit, both in wasm off one allowlist.
   report(request.requestId, "strip", 80);
   const result = stripAndAudit(new Uint8Array(encoded), outputType);
   const tStripped = performance.now();
@@ -160,7 +160,7 @@ async function sanitize(
     type: "done",
     ok: true,
     requestId: request.requestId,
-    outputType: outputType as SupportedFormat,
+    outputType,
     outputAudit,
     outputBuffer,
     inputByteLength,
@@ -177,9 +177,9 @@ async function sanitize(
   };
 }
 
-function clampPct(pct: number | undefined): number {
+function clampPct(pct: number): number {
   if (!Number.isFinite(pct)) return 100;
-  return Math.min(100, Math.max(10, Math.round(pct as number)));
+  return Math.min(100, Math.max(10, Math.round(pct)));
 }
 
 function clampQuality(type: string, quality: number): number | undefined {

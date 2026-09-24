@@ -1,4 +1,3 @@
-/* Design tokens, reset, page frame, hero, shared buttons/forms, footer, shared keyframes. */
 :root {
   --bg: #0a1812;
   --bg-2: #0c2018;
@@ -22,8 +21,6 @@
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --radius: 16px;
   --shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
-  /* Shared motion curves. `out` = calm deceleration (collapses, exits); `spring` = soft overshoot
-     (entrances, pops); `inout` = symmetric (height/morph). One vocabulary so motion feels coherent. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
@@ -33,12 +30,10 @@
   box-sizing: border-box;
 }
 
-/* Make the hidden attribute authoritative over component display rules. */
 [hidden] {
   display: none !important;
 }
 
-/* inert slides stay laid out (so we can measure them) but out of the a11y tree + tab order. */
 [inert] {
   pointer-events: none;
   cursor: default;
@@ -57,9 +52,6 @@ body {
   background: var(--bg);
 }
 
-/* The page gradient and grid both live on fixed, GPU-promoted layers. Painting them via
-   `background-attachment: fixed` on <body> forced a full-viewport repaint on every scroll
-   frame (the measured scroll jank); their own composited layers scroll for free. */
 body::before {
   content: "";
   position: fixed;
@@ -100,7 +92,6 @@ body::before {
   gap: clamp(16px, 2.4vw, 26px);
 }
 
-/* ---------- hero (full banner ↔ sticky bar) ---------- */
 .hero {
   padding: 6px 4px;
   transition: padding 320ms var(--ease-out);
@@ -158,7 +149,7 @@ body::before {
   overflow: hidden;
   transition: max-height 360ms var(--ease-out), opacity 260ms ease, margin 360ms var(--ease-out);
 }
-/* "New image" reset lives in the bar; only earns its place once we're working. */
+
 .bar-reset {
   display: none;
   margin-left: auto;
@@ -184,16 +175,12 @@ body::before {
   background: rgba(232, 64, 43, 0.18);
 }
 
-/* The step indicator drops to its own full-width row under the lockup on the landing slide. */
 .stepbar {
   flex: 1 0 100%;
   order: 9;
   margin-top: 2px;
 }
 
-/* ---- working state: hero collapses into a sticky bar, flush to the very top ---- */
-/* Drop the shell's top padding so the bar pins to the viewport edge with no gap above it,
-   and stretch it the full shell width (cancel the shell's side padding). */
 body[data-mode="working"] .shell {
   padding-top: 0;
 }
@@ -242,7 +229,7 @@ body[data-mode="working"] .stepbar {
 body[data-mode="working"] .bar-reset {
   display: inline-flex;
 }
-/* Compact step indicator in the bar: dots only, no labels/hints/connector. */
+
 body[data-mode="working"] .steps {
   gap: 8px;
 }
@@ -290,7 +277,6 @@ body[data-mode="working"] .step-dot {
   color: #5fd29a;
 }
 
-/* ---------- panels ---------- */
 .panel {
   background: var(--card);
   border: 1px solid var(--line);
@@ -299,7 +285,6 @@ body[data-mode="working"] .step-dot {
   box-shadow: var(--shadow);
 }
 
-/* ---------- shared buttons ---------- */
 .primary {
   margin-top: 18px;
   width: 100%;
@@ -315,38 +300,19 @@ body[data-mode="working"] .step-dot {
   font: 700 1.02rem var(--sans);
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(232, 64, 43, 0.32);
-  transition: transform 140ms var(--ease-spring), box-shadow 140ms var(--ease-out),
-    filter 140ms ease;
+  transition: transform 140ms var(--ease-spring), box-shadow 140ms var(--ease-out);
 }
 .primary svg {
   width: 20px;
   height: 20px;
 }
-.primary:hover:not(:disabled) {
+.primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 36px rgba(232, 64, 43, 0.44);
 }
-.primary:active:not(:disabled) {
+.primary:active {
   transform: translateY(0) scale(0.985);
   transition-duration: 60ms;
-}
-.primary:disabled {
-  filter: grayscale(0.4);
-  opacity: 0.55;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-.btn-spinner {
-  display: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2.5px solid rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
-  animation: spin 0.7s linear infinite;
-}
-.primary.loading .btn-spinner {
-  display: inline-block;
 }
 
 .ghost-btn {
@@ -403,7 +369,6 @@ body[data-mode="working"] .step-dot {
   height: 18px;
 }
 
-/* ---------- shared form controls ---------- */
 .field-label {
   display: block;
   margin-bottom: 6px;
@@ -487,7 +452,6 @@ input[type="range"] {
   font-size: 0.8rem;
 }
 
-/* ---------- footer ---------- */
 .foot {
   display: flex;
   align-items: center;
@@ -516,7 +480,6 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-/* ---------- drag overlay ---------- */
 .drag-overlay {
   position: fixed;
   inset: 0;
@@ -567,12 +530,6 @@ input[type="range"] {
   height: 30px;
 }
 
-/* ---------- shared keyframes ---------- */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes shimmer {
   to {
     background-position: -200% 0;
@@ -610,7 +567,7 @@ input[type="range"] {
     top: 100%;
   }
 }
-/* Staggered result reveal, content rises and fades in, slightly more travel than fade-up. */
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -621,7 +578,7 @@ input[type="range"] {
     transform: translateY(0);
   }
 }
-/* Step dot acknowledges completion with a single gentle bounce. */
+
 @keyframes dot-pop {
   0% {
     transform: scale(1);
@@ -633,7 +590,7 @@ input[type="range"] {
     transform: scale(1);
   }
 }
-/* A ring expands and fades out behind the ✓ when sanitize finishes. */
+
 @keyframes ring-burst {
   0% {
     transform: scale(0.5);
@@ -644,7 +601,7 @@ input[type="range"] {
     opacity: 0;
   }
 }
-/* Slow diagonal sheen sweeping the idle dropzone, hinting it is interactive. */
+
 @keyframes sheen {
   0% {
     transform: translateX(-120%) skewX(-18deg);

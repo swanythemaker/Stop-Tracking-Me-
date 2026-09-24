@@ -1,17 +1,7 @@
-/* tslint:disable */
-/* eslint-disable */
-
-/**
- * Result of `decode_and_transform`: read dims (cheap getters) first, then `take_rgba()` last — it
- * moves the pixel buffer out to avoid copying a full frame.
- */
 export class DecodeResult {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
-    /**
-     * Moves the RGBA8 buffer out (consumes the result). Call after reading the dimensions.
-     */
     takeRgba(): Uint8Array;
     readonly height: number;
     readonly origHeight: number;
@@ -28,21 +18,10 @@ export class StripAuditResult {
     readonly passed: boolean;
 }
 
-/**
- * Audit arbitrary image bytes (format auto-detected). Used for the informational input scan, so
- * input and output verdicts come from the exact same code.
- */
 export function auditBytes(input: Uint8Array): string;
 
-/**
- * Decode `input` to upright RGBA8, then apply user transforms (flip → rotate → resize).
- */
 export function decodeAndTransform(input: Uint8Array, opts_json: string): DecodeResult;
 
-/**
- * Strip the re-encoded bytes to the allowlist, then audit the result with the SAME allowlist.
- * `format` is the MIME of the encoded bytes (`image/png` | `image/jpeg` | `image/webp`).
- */
 export function stripAndAudit(encoded: Uint8Array, format: string): StripAuditResult;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -70,22 +49,6 @@ export interface InitOutput {
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
 
-/**
- * Instantiates the given `module`, which can either be bytes or
- * a precompiled `WebAssembly.Module`.
- *
- * @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
- *
- * @returns {InitOutput}
- */
 export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
 
-/**
- * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
- * for everything else, calls `WebAssembly.instantiate` directly.
- *
- * @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
- *
- * @returns {Promise<InitOutput>}
- */
 export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;

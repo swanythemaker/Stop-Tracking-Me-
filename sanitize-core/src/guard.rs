@@ -1,9 +1,6 @@
-//! Dimension / pixel guardrails. The byte-size limit stays in TS at the worker boundary (cheap,
-//! pre-wasm); these run once dimensions are known (read from the header before full decode).
-
-pub const MAX_WIDTH: u32 = 16384;
-pub const MAX_HEIGHT: u32 = 16384;
-pub const MAX_PIXELS: u64 = 100_000_000;
+const MAX_WIDTH: u32 = 16384;
+const MAX_HEIGHT: u32 = 16384;
+const MAX_PIXELS: u64 = 100_000_000;
 
 pub fn check_dimensions(w: u32, h: u32) -> Result<(), String> {
     if w > MAX_WIDTH || h > MAX_HEIGHT {

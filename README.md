@@ -2,6 +2,10 @@
 
 **Strip the tracking out of your photos, in your browser, before you share them.**
 
+Current release: **v0.6.0**. Versions follow strict [semantic versioning](https://semver.org)
+(`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
+number, and the running build shows it in the page footer.
+
 Photos carry more than pixels. EXIF timestamps, GPS coordinates, camera serials, editing
 history, and content-credential signatures all ride along inside the file. STOPTRACKINGME
 removes them, then **proves** the result is clean before it lets you download.
@@ -104,7 +108,9 @@ It also depends on your runtime being intact. When in doubt, it fails closed.
 
 ```bash
 npm install
-npm run dev      # http://localhost:8888
+npm run dev        # dev server on http://localhost:8888
+npm run build      # production bundle in dist/
+npm run preview    # serve the production bundle on http://localhost:8888
 ```
 
 ## Build & test
@@ -115,7 +121,12 @@ npm run build:wasm  # rebuild the Rust sanitize-core wasm (needs Rust + wasm-pac
 npm run test:e2e    # zero-network + cross-engine determinism + the edit tools
 cargo test --manifest-path sanitize-core/Cargo.toml   # the core's own contract tests
 node scripts/copy-check.mjs   # house-style check: no em-dashes in the public copy
+cargo clippy --manifest-path sanitize-core/Cargo.toml   # lint gate for the core, kept at zero warnings
 ```
+
+The source tree is kept comment-free on purpose. Names, types and the tests carry the intent, and
+this README plus `docs/` carry the explanations. Every release also re-checks for unused exports,
+CSS rules and Rust items and drops them.
 
 Two contracts back the promise: the e2e test watches every network request during a real sanitize
 and fails if a single byte tries to leave the page; the core's tests prove that stripped output

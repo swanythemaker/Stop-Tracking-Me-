@@ -21,7 +21,7 @@ page.on("requestfailed", (r) =>
 
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForSelector("#dropzone");
-// give HMR ws + worker a moment to settle
+
 await page.waitForTimeout(1500);
 
 await page.screenshot({ path: "screenshots/check-hero.png" });

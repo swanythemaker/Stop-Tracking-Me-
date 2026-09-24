@@ -1,14 +1,10 @@
-// The app's full markup, built once into #app. Split out of main.ts so the wiring logic stays
-// readable. Element ids are the contract the wiring + tests rely on, so keep them stable.
 import { ICON } from "./icons";
 
 export function appMarkup(): string {
   return `
   <div class="bg-grid" aria-hidden="true"></div>
   <main class="shell">
-    <!-- Hero doubles as the app chrome: full banner on the landing slide, a ~48px sticky bar
-         once an image is loaded. The step indicator folds into this bar, one bar, not two. -->
-    <header class="hero" id="hero">
+    <header class="hero">
       <div class="hero-bar">
         <div class="hero-mark">${ICON.shield}</div>
         <div class="hero-headline">
@@ -18,7 +14,7 @@ export function appMarkup(): string {
 
         <nav class="stepbar" aria-label="Progress">
           <ol class="steps">
-            <li class="step is-active" id="stepUpload" data-step="1" aria-current="step">
+            <li class="step is-active" id="stepUpload" aria-current="step">
               <span class="step-dot">
                 <span class="step-num">1</span>
                 <span class="step-ico step-ico-check">${ICON.check}</span>
@@ -27,7 +23,7 @@ export function appMarkup(): string {
               <span class="step-label">Upload<small class="step-hint">Drop an image</small></span>
             </li>
             <li class="step-connector" aria-hidden="true"><i class="connector-fill"></i></li>
-            <li class="step is-locked" id="stepClean" data-step="2" aria-disabled="true">
+            <li class="step is-locked" id="stepClean" aria-disabled="true">
               <span class="step-dot">
                 <span class="step-num">2</span>
                 <span class="step-ico step-ico-check">${ICON.check}</span>
@@ -56,9 +52,8 @@ export function appMarkup(): string {
     </header>
 
     <div class="carousel" id="carousel">
-      <div class="carousel-track" id="track">
+      <div class="carousel-track">
 
-        <!-- Slide 0: upload -->
         <section class="slide" id="slideUpload" aria-label="Step 1: upload an image">
           <div class="panel">
             <div class="dropzone" id="dropzone" role="button" tabindex="0"
@@ -83,22 +78,20 @@ export function appMarkup(): string {
           </div>
         </section>
 
-        <!-- Slide 1: processing (the animated bridge to step 2) -->
         <section class="slide" id="slideProcessing" aria-label="Sanitizing your image">
           <div class="panel processing">
             <div class="proc-frame" id="procFrame">
               <img id="procPreview" alt="" />
               <div class="scanline" aria-hidden="true"></div>
-              <div class="proc-check" id="procCheck" aria-hidden="true">${ICON.check}</div>
+              <div class="proc-check" aria-hidden="true">${ICON.check}</div>
             </div>
-            <div class="progress" id="progress">
+            <div class="progress">
               <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
               <p class="progress-stage" id="progressStage">Working…</p>
             </div>
           </div>
         </section>
 
-        <!-- Slide 2: clean image (view mode + inline mini-editor) -->
         <section class="slide" id="slideResult" aria-label="Step 2: your clean image">
           <div class="panel result-stage" id="resultStage">
             <p class="result-headline" id="resultHeadline"></p>
@@ -118,8 +111,7 @@ export function appMarkup(): string {
               </figure>
             </div>
 
-            <!-- view-mode actions -->
-            <div class="result-actions" id="resultActions">
+            <div class="result-actions">
               <div id="downloadArea"></div>
               <div class="result-buttons">
                 <button id="editBtn" class="ghost-btn" type="button">${ICON.edit}<span>Edit</span></button>
@@ -127,7 +119,6 @@ export function appMarkup(): string {
               </div>
             </div>
 
-            <!-- edit-mode mini-editor -->
             <div class="editor" id="editor">
               <div class="editor-head">
                 <span class="editor-title">Edit</span>
@@ -144,7 +135,7 @@ export function appMarkup(): string {
               </label>
 
               <div class="advanced" id="advanced">
-                <label class="field">
+                <label>
                   <span class="field-label">Output format</span>
                   <select id="outputFormat">
                     <option value="same">Same as input</option>
@@ -153,7 +144,7 @@ export function appMarkup(): string {
                     <option value="image/webp">WebP</option>
                   </select>
                 </label>
-                <label class="field">
+                <label>
                   <span class="field-label">Quality <b id="qualityValue">92</b></span>
                   <input id="quality" type="range" min="60" max="100" value="92" />
                 </label>
@@ -187,10 +178,10 @@ export function appMarkup(): string {
                 <p class="adjust-note">Applied to the clean output, before re-encode. Resampling also disrupts pixel-hidden traces. It reduces, not removes.</p>
               </div>
 
-              <button id="editDone" class="primary" type="button">${ICON.check}<span class="btn-label">Done</span></button>
+              <button id="editDone" class="primary" type="button">${ICON.check}<span>Done</span></button>
             </div>
 
-            <details class="raw" id="foundDetails">
+            <details class="raw">
               <summary>What we found &amp; removed</summary>
               <div class="scan-grid">
                 <div class="scan-card" id="inputScanCard"></div>

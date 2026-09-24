@@ -1,8 +1,3 @@
-/* Below-the-fold marketing/explainer content: how-it-works, FAQ, roadmap.
-   Shown on the landing slide; folded away once you're working so the tool owns the screen. */
-
-/* `content-visibility` keeps this tall block out of layout/paint until it's scrolled near , 
-   it was the always-laid-out weight behind the scroll jank. */
 .docs {
   content-visibility: auto;
   contain-intrinsic-size: auto 1400px;
@@ -57,7 +52,6 @@ body[data-mode="working"] .docs {
   color: var(--ink-soft);
 }
 
-/* ---------- roadmap / vision ---------- */
 .roadmap {
   margin-top: 22px;
   padding: clamp(20px, 3vw, 32px);
