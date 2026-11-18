@@ -8,7 +8,7 @@ export function appMarkup(): string {
       <div class="hero-bar">
         <div class="hero-mark">${ICON.shield}</div>
         <div class="hero-headline">
-          <p class="eyebrow">Browser-only image and video sanitizer</p>
+          <p class="eyebrow">Browser-only image, video and link sanitizer</p>
           <h1>STOP<span>TRACKING</span>ME</h1>
         </div>
 
@@ -268,6 +268,24 @@ export function appMarkup(): string {
       </div>
     </div>
 
+    <section class="panel links" id="linkPanel" aria-labelledby="linkTitle">
+      <h2 id="linkTitle">Clean a link</h2>
+      <p class="links-lead">Paste a link, or a whole message with links in it. The tracking tags that Facebook, Instagram, X, TikTok, YouTube, Amazon, eBay and the ad networks add come off right here in your browser. Nothing is sent anywhere, not even to us.</p>
+      <textarea id="linkInput" class="link-box" rows="3" spellcheck="false" autocomplete="off"
+                aria-label="Link or text to clean"
+                placeholder="https://www.amazon.com/Some-Product/dp/B08N5WRWNW/ref=sr_1_3?tag=..."></textarea>
+      <p class="link-state" id="linkState" role="status" aria-live="polite"></p>
+      <div class="link-out" id="linkOut" hidden>
+        <span class="field-label">Clean</span>
+        <textarea id="linkOutput" class="link-box" rows="3" readonly aria-label="Clean text"></textarea>
+        <details class="link-details">
+          <summary id="linkSummary"></summary>
+          <ul class="link-report" id="linkReport" role="list"></ul>
+        </details>
+        <button id="linkCopy" class="primary" type="button">${ICON.check}<span>Copy clean link</span></button>
+      </div>
+    </section>
+
     <section class="panel docs">
       <div class="docs-grid">
         <article>
@@ -327,6 +345,14 @@ export function appMarkup(): string {
           <p>It can reduce some. Reduce hidden marks runs a small local autoencoder round trip plus a resample and requantize, which defeats fragile marks such as the DWT-DCT scheme older Stable Diffusion builds used. It does not remove SynthID or similar robust marks, it cannot verify that anything is gone, and a processed image can itself be recognised as processed.</p>
         </details>
         <details>
+          <summary>How does Clean a link work?</summary>
+          <p>It removes the tags that only exist to track who shared a link and who clicked it: utm and click IDs from the ad networks (fbclid, gclid, msclkid and others), share IDs from X, Instagram, TikTok, YouTube and Spotify, and referral codes from Amazon and eBay. Amazon and eBay product links are cut down to the product number. Facebook, Google and YouTube redirect links are replaced by the real address inside them. Anything it does not recognise stays, so the link keeps working. It all runs in your browser.</p>
+        </details>
+        <details>
+          <summary>Can it open short links like t.co, bit.ly or amzn.to?</summary>
+          <p>No, on purpose. A short link is just a code. Only the company behind it knows where it leads, and asking them tells them you clicked. The page marks short links so you know. To clean one, open it in a private window, copy the full address and paste that here.</p>
+        </details>
+        <details>
           <summary>How does Remove marked area work?</summary>
           <p>You mark the watermark with the brush or a corner preset. A local inpainting model (MI-GAN, or LaMa for High quality) fills only the marked pixels, then the image goes through the same encode, strip and audit as any other. The models download once, after your click, are verified against a hash pinned in the source, and can be deleted from the editor.</p>
         </details>
@@ -384,11 +410,6 @@ export function appMarkup(): string {
           <section class="roadmap-group">
             <h3>Beyond photos</h3>
             <ul class="roadmap-list" role="list">
-              <li>
-                <strong>Clean the links you share.</strong>
-                Strip the tracking tails off a URL and expand shortened redirects that sneak them
-                back in.
-              </li>
               <li>
                 <strong>Show what's watching.</strong>
                 A read-out of what a page can use to fingerprint you, and the third-party calls it

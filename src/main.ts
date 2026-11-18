@@ -2,6 +2,7 @@ import "./styles/base.css";
 import "./styles/stepflow.css";
 import "./styles/results.css";
 import "./styles/docs.css";
+import "./styles/links.css";
 
 import {
   describeAudit,
@@ -24,12 +25,14 @@ import { MaskEditor } from "./ui/maskEditor";
 import { WatermarkPanel } from "./ui/watermarkPanel";
 import { storedModelBytes } from "./sanitizer/models/loader";
 import { DetectClient } from "./sanitizer/detect/client";
+import { mountLinkPanel } from "./ui/linkPanel";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
   throw new Error("App root not found");
 }
 app.innerHTML = appMarkup();
+mountLinkPanel();
 
 const client = new SanitizeClient();
 

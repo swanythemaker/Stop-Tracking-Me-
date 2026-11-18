@@ -1,8 +1,8 @@
 # STOPTRACKINGME
 
-**Strip the tracking out of your photos and videos, in your browser, before you share them.**
+**Strip the tracking out of your photos, videos and links, in your browser, before you share them.**
 
-Current release: **v0.8.2**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.9.0**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 
@@ -207,6 +207,33 @@ Models load **on demand**, only when you press the feature that needs one, never
 
 `docs/models.md` lists every hosted file with its hash, upstream revision and licence.
 
+## Clean a link
+
+Paste a link, or a whole message with links in it, into **Clean a link**. The clean text appears
+as you type, with a list of what came off each link and a copy button. It is plain string work in
+the page: no request, no worker, no model.
+
+| Rule | What happens | Examples |
+|---|---|---|
+| Known tracking tags, any site | removed | `utm_*`, `fbclid`, `gclid`, `msclkid`, `ttclid`, `twclid`, `igshid`, `mc_eid`, `_hsenc`, `srsltid` |
+| Site share tags | removed | X `s`/`t`, Instagram `igsh`, YouTube `si`/`pp`/`feature`, Spotify `si`, TikTok share query, LinkedIn `trk`/`rcm`, Reddit `share_id`, Facebook `__cft__`/`__tn__`/`mibextid` |
+| Shop product links | cut to the product number | Amazon `/dp/<ASIN>` (drops `tag`, `/ref=`, the title), eBay `/itm/<id>` (keeps `var`), AliExpress, Etsy, Temu |
+| Redirect wrappers | replaced by the address inside | `l.facebook.com`, `l.instagram.com`, Google `/url`, YouTube `/redirect`, `out.reddit.com`, LinkedIn, VK, Steam |
+| Text fragments | removed | `#:~:text=` (what you highlighted), `#xtor=` |
+| Short links | flagged, left as they are | `t.co`, `bit.ly`, `amzn.to`, `vm.tiktok.com`, Reddit `/s/` links |
+
+There is no fully general rule. A blocklist of known tag names catches most of it, because the ad
+networks add the same click IDs to every site. Some sites hide the tracking in the path or in tags
+with plain names like `s` or `si`, so those get a small rule each. Anything unrecognised stays,
+because removing an unknown tag can break the link. A link with nothing to remove comes back byte
+for byte.
+
+Short links are not opened. Only the company behind a short link knows where it leads, and asking
+it tells it you clicked, so the page says so and suggests opening it in a private window first.
+
+The rules live in `src/links/clean.ts`; `tests/unit/links.spec.ts` holds one real-shaped link per
+rule.
+
 ## What it can't do
 
 This is metadata and provenance removal, not magic. It **cannot** guarantee removal of:
@@ -264,7 +291,7 @@ behaviour in [`docs/spikes-v0.7.0.md`](docs/spikes-v0.7.0.md).
   evidence against SynthID, once a one-step model with TAESD as the decoder gets it under a few
   minutes per image.
 - **Own small detector** (Apache-2.0) to replace the 275 MB Florence-2 download.
-- **Video watermark removal (v0.9.0)**: a mask from the frames that never change, reverse alpha
+- **Video watermark removal**: a mask from the frames that never change, reverse alpha
   blending for semi-transparent overlays, small-crop inpaint for the rest.
 - **Multi-codec verification**: encode/decode through independent engines and fail on
   pixel-hash mismatches.
