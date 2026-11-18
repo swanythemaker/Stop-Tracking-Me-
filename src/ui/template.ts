@@ -162,7 +162,7 @@ export function appMarkup(): string {
 
               <div class="video-options" id="videoOptions" hidden>
                 <label class="switch-row">
-                  <input id="keepAudio" type="checkbox" />
+                  <input id="keepAudio" type="checkbox" checked />
                   <span class="switch" aria-hidden="true"></span>
                   <span class="switch-text">
                     <strong>Keep sound</strong>

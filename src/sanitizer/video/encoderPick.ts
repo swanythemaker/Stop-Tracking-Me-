@@ -39,7 +39,8 @@ const AVC_LEVELS: readonly { idc: number; maxFs: number; maxMbps: number }[] = [
 ];
 
 const MIN_BITRATE = 500_000;
-const MAX_BITRATE = 20_000_000;
+const MAX_BITRATE = 40_000_000;
+const SOURCE_HEADROOM = 1.3;
 const BITS_PER_PIXEL = 0.1;
 const DEFAULT_FPS = 30;
 
@@ -56,6 +57,19 @@ export function bitrateFor(width: number, height: number, fps: number): number {
   const raw = BITS_PER_PIXEL * width * height * saneFps(fps);
   if (!Number.isFinite(raw)) return MIN_BITRATE;
   return Math.round(Math.min(MAX_BITRATE, Math.max(MIN_BITRATE, raw)));
+}
+
+export function bitrateMatching(
+  width: number,
+  height: number,
+  fps: number,
+  source: { width: number; height: number; bitrate: number },
+): number {
+  const floor = bitrateFor(width, height, fps);
+  const srcPixels = source.width * source.height;
+  if (!(source.bitrate > 0) || !(srcPixels > 0)) return floor;
+  const scaled = (source.bitrate * SOURCE_HEADROOM * width * height) / srcPixels;
+  return Math.round(Math.min(MAX_BITRATE, Math.max(floor, scaled)));
 }
 
 function isAvc(codec: string): boolean {

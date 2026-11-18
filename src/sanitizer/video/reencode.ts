@@ -2,6 +2,8 @@ import {
   AudioSampleSink,
   AudioSampleSource,
   BlobSource,
+  EncodedAudioPacketSource,
+  EncodedPacketSink,
   Input,
   MATROSKA,
   MP4,
@@ -16,7 +18,7 @@ import {
   WebMOutputFormat,
 } from "mediabunny";
 import type { AudioPick, EncoderPick, VideoContainer } from "../types";
-import { bitrateFor } from "./encoderPick";
+import { bitrateMatching } from "./encoderPick";
 import { PlanePipe, type PlaneOps } from "./planes";
 
 export class FailoverError extends Error {
@@ -24,6 +26,20 @@ export class FailoverError extends Error {
     super(message);
     this.name = "FailoverError";
   }
+}
+
+const ENCODER_TAG = [0x4c, 0x61, 0x76, 0x63];
+
+function blankEncoderTags(data: Uint8Array): Uint8Array | null {
+  let out: Uint8Array | null = null;
+  for (let i = 0; i + ENCODER_TAG.length <= data.length; i++) {
+    if (!ENCODER_TAG.every((b, k) => data[i + k] === b)) continue;
+    out ??= data.slice();
+    let j = i;
+    while (j < out.length && out[j] >= 0x20 && out[j] < 0x7f) out[j++] = 0;
+    i = j - 1;
+  }
+  return out;
 }
 
 type ReencodeOptions = {
@@ -152,7 +168,7 @@ export async function reencodeVideo(
     const videoSource = new VideoSampleSource({
       codec: shortCodec(opts.encoder.name),
       fullCodecString: opts.encoder.codec,
-      bitrate: bitrateFor(dims.width, dims.height, fps),
+      bitrate: bitrateMatching(dims.width, dims.height, fps, { width: srcW, height: srcH, bitrate: stats.averageBitrate }),
       keyFrameInterval: 2,
       latencyMode: "quality",
       hardwareAcceleration: "no-preference",
@@ -160,11 +176,20 @@ export async function reencodeVideo(
     output.addVideoTrack(videoSource, { frameRate: fps });
 
     let audioSource: AudioSampleSource | null = null;
+    let audioCopy: EncodedAudioPacketSource | null = null;
+    let audioConfig: AudioDecoderConfig | null = null;
     let audioTrack: Awaited<ReturnType<typeof input.getPrimaryAudioTrack>> = null;
     if (opts.keepAudio) {
       audioTrack = await input.getPrimaryAudioTrack();
+      const srcCodec = audioTrack?.codec ?? null;
+      if (audioTrack && srcCodec && format.getSupportedAudioCodecs().includes(srcCodec)) {
+        audioConfig = await audioTrack.getDecoderConfig();
+      }
       if (!audioTrack) {
         notes.push("The video has no sound track.");
+      } else if (srcCodec && audioConfig) {
+        audioCopy = new EncodedAudioPacketSource(srcCodec);
+        output.addAudioTrack(audioCopy);
       } else if (!opts.audio) {
         notes.push("Sound dropped: no audio encoder in this browser.");
         audioTrack = null;
@@ -172,7 +197,7 @@ export async function reencodeVideo(
         notes.push("Sound dropped: your browser cannot decode this audio codec.");
         audioTrack = null;
       } else {
-        audioSource = new AudioSampleSource({ codec: opts.audio.codec === "opus" ? "opus" : "aac", bitrate: 128_000 });
+        audioSource = new AudioSampleSource({ codec: opts.audio.codec === "opus" ? "opus" : "aac", bitrate: 192_000 });
         output.addAudioTrack(audioSource);
       }
     }
@@ -237,6 +262,20 @@ export async function reencodeVideo(
         }
         videoSource.close();
       })();
+      const videoStart = await vt.getFirstTimestamp();
+      const copyLoop = (async () => {
+        if (!audioCopy || !audioTrack || !audioConfig) return;
+        let first = true;
+        for await (const packet of new EncodedPacketSink(audioTrack).packets()) {
+          if (signal.aborted) throw new Error("Cancelled.");
+          const timestamp = packet.timestamp - Math.max(0, videoStart);
+          if (timestamp < 0) continue;
+          const data = blankEncoderTags(packet.data);
+          await audioCopy.add(packet.clone(data ? { timestamp, data } : { timestamp }), first ? { decoderConfig: audioConfig } : undefined);
+          first = false;
+        }
+        audioCopy.close();
+      })();
       const audioLoop = (async () => {
         if (!audioSource || !audioTrack) return;
         const sink = new AudioSampleSink(audioTrack);
@@ -258,7 +297,7 @@ export async function reencodeVideo(
         }
         audioSource.close();
       })();
-      await Promise.all([videoLoop, audioLoop]);
+      await Promise.all([videoLoop, audioLoop, copyLoop]);
       report("mux", 81);
       await output.finalize();
     } finally {
@@ -275,7 +314,7 @@ export async function reencodeVideo(
       origHeight: srcH,
       frames,
       durationS,
-      audioKept: audioSource !== null,
+      audioKept: audioSource !== null || audioCopy !== null,
       notes,
     };
   } finally {

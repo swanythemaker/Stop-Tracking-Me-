@@ -2,7 +2,7 @@
 
 **Strip the tracking out of your photos and videos, in your browser, before you share them.**
 
-Current release: **v0.8.0**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.8.2**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 

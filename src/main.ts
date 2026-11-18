@@ -345,6 +345,7 @@ async function handleFileSelection(file: File | null): Promise<void> {
   selectedFile = file;
   selectedKind = kind;
   selectedType = kind === "video" ? (videoTypeFor(file.type, file.name) ?? file.type) : file.type;
+  if (kind === "video") ultraParanoid.checked = false;
   syncMediaUi();
 
   const previewUrl = URL.createObjectURL(file);
