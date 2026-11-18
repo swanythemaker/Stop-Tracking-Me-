@@ -8,11 +8,17 @@ export function appMarkup(): string {
       <div class="hero-bar">
         <div class="hero-mark">${ICON.shield}</div>
         <div class="hero-headline">
-          <p class="eyebrow">Browser-only image, video and link sanitizer</p>
+          <p class="eyebrow">Private by default</p>
           <h1>STOP<span>TRACKING</span>ME</h1>
         </div>
 
-        <nav class="stepbar" aria-label="Progress">
+        <nav class="tools" role="tablist" aria-label="What do you want to clean?">
+          <button class="tool-tab" type="button" role="tab" data-tool-tab="photo" id="tabPhoto">${ICON.photo}<span>Photos</span></button>
+          <button class="tool-tab" type="button" role="tab" data-tool-tab="video" id="tabVideo">${ICON.video}<span>Videos</span></button>
+          <button class="tool-tab" type="button" role="tab" data-tool-tab="link" id="tabLink">${ICON.link}<span>Links</span></button>
+        </nav>
+
+        <nav class="stepbar" aria-label="Progress" data-for="photo video">
           <ol class="steps">
             <li class="step is-active" id="stepUpload" aria-current="step">
               <span class="step-dot">
@@ -34,36 +40,47 @@ export function appMarkup(): string {
           </ol>
         </nav>
 
-        <button id="barReset" class="bar-reset" type="button"
+        <button id="barReset" class="bar-reset" type="button" data-for="photo video"
                 aria-label="Start over with a new file">${ICON.refresh}<span>New file</span></button>
       </div>
 
       <div class="hero-text">
-        <p class="subtitle">
-          Strip EXIF, GPS, XMP, C2PA and hidden metadata from your photos, and the location,
-          device and encoder tags hidden in your videos. Everything runs locally in your browser,
-          and your file is never uploaded.
+        <p class="subtitle" data-for="photo">
+          Strip the GPS location, camera details, dates, edit history and C2PA credentials hidden
+          in your photos. Everything runs in your browser. Your photo is never uploaded.
+        </p>
+        <p class="subtitle" data-for="video">
+          Strip the location, device, dates and encoder tags hidden in your videos. Everything runs
+          in your browser. Your video is never uploaded.
+        </p>
+        <p class="subtitle" data-for="link">
+          Take the tracking tags off a link before you share it: Facebook, Instagram, X, TikTok,
+          YouTube, Amazon, eBay and the ad networks. Everything runs in your browser. Nothing is
+          sent anywhere.
         </p>
         <ul class="trust" role="list">
           <li>${ICON.check}<span>No uploads</span></li>
           <li>${ICON.check}<span>No analytics</span></li>
-          <li>${ICON.check}<span>Fail-closed audit</span></li>
+          <li data-for="photo video">${ICON.check}<span>Fail-closed audit</span></li>
+          <li data-for="link">${ICON.check}<span>Short links never opened</span></li>
         </ul>
       </div>
     </header>
 
-    <div class="carousel" id="carousel">
+    <div class="carousel" id="carousel" data-for="photo video">
       <div class="carousel-track">
 
         <section class="slide" id="slideUpload" aria-label="Step 1: upload a file">
           <div class="panel">
             <div class="dropzone" id="dropzone" role="button" tabindex="0"
-                 aria-label="Drop an image or video, or press Enter to browse">
+                 aria-label="Drop a file, or press Enter to browse">
               <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.m4v,.mov,.webm,.mkv" hidden />
               <div class="dz-icon">${ICON.upload}</div>
-              <strong class="dz-title">Drop an image or video here</strong>
+              <strong class="dz-title" data-for="photo">Drop a photo here</strong>
+              <strong class="dz-title" data-for="video">Drop a video here</strong>
               <span class="dz-sub">or <u>browse files</u></span>
-              <span class="dz-formats">PNG · JPEG · WebP up to 64&nbsp;MB · MP4 · MOV · WebM up to 100&nbsp;MB</span>
+              <span class="dz-formats" data-for="photo">PNG · JPEG · WebP up to 64&nbsp;MB</span>
+              <span class="dz-formats" data-for="video">MP4 · MOV · WebM · MKV up to 100&nbsp;MB</span>
             </div>
 
             <div class="filecard" id="fileCard" hidden>
@@ -76,7 +93,7 @@ export function appMarkup(): string {
               <button id="clearFile" class="icon-btn" type="button" aria-label="Remove file">${ICON.x}</button>
             </div>
 
-            <p id="status" class="status" role="status" aria-live="polite">Select an image or video to begin.</p>
+            <p id="status" class="status" role="status" aria-live="polite"></p>
             <p id="capNote" class="cap-note" hidden></p>
           </div>
         </section>
@@ -268,9 +285,8 @@ export function appMarkup(): string {
       </div>
     </div>
 
-    <section class="panel links" id="linkPanel" aria-labelledby="linkTitle">
-      <h2 id="linkTitle">Clean a link</h2>
-      <p class="links-lead">Paste a link, or a whole message with links in it. The tracking tags that Facebook, Instagram, X, TikTok, YouTube, Amazon, eBay and the ad networks add come off right here in your browser. Nothing is sent anywhere, not even to us.</p>
+    <section class="panel links" id="linkPanel" data-for="link" aria-label="Clean a link">
+      <span class="field-label">Paste a link, or a whole message with links in it</span>
       <textarea id="linkInput" class="link-box" rows="3" spellcheck="false" autocomplete="off"
                 aria-label="Link or text to clean"
                 placeholder="https://www.amazon.com/Some-Product/dp/B08N5WRWNW/ref=sr_1_3?tag=..."></textarea>
@@ -288,71 +304,93 @@ export function appMarkup(): string {
 
     <section class="panel docs">
       <div class="docs-grid">
-        <article>
+        <article data-for="photo video">
           <h2>How it works</h2>
           <ol class="how-list">
-            <li>Drop or pick a PNG, JPEG or WebP image, or an MP4, MOV or WebM video.</li>
-            <li>Images are decoded to raw pixels and re-encoded fresh. Videos are decoded frame by frame and re-encoded with your browser's encoder, or rebuilt from the raw samples when it has none.</li>
-            <li>Format-specific stripping removes every non-essential chunk, box, marker and in-stream encoder tag.</li>
+            <li data-for="photo">Drop or pick a PNG, JPEG or WebP photo.</li>
+            <li data-for="photo">It is decoded to raw pixels and re-encoded fresh.</li>
+            <li data-for="photo">Every non-essential chunk and marker is stripped.</li>
+            <li data-for="video">Drop or pick an MP4, MOV, WebM or MKV video.</li>
+            <li data-for="video">It is decoded frame by frame and re-encoded with your browser's encoder, or rebuilt from the raw samples when it has none.</li>
+            <li data-for="video">Every metadata box and in-stream encoder tag is stripped.</li>
             <li>A strict audit re-scans the output. If anything looks off, download is blocked.</li>
             <li>Download your verified-clean file.</li>
           </ol>
         </article>
-        <article>
+        <article data-for="photo video">
           <h2>What gets removed</h2>
           <ul class="wiki-list">
-            <li><b>EXIF</b>: camera, timestamp, and GPS location.</li>
-            <li><b>XMP / IPTC</b>: editor &amp; press metadata blocks.</li>
+            <li data-for="photo"><b>EXIF</b>: camera, timestamp, and GPS location.</li>
+            <li data-for="photo"><b>XMP / IPTC</b>: editor &amp; press metadata blocks.</li>
             <li><b>C2PA</b>: provenance &amp; content-credential signatures.</li>
-            <li><b>JPEG APP/COM</b>: app marker segments.</li>
-            <li><b>PNG text chunks</b>: tEXt, zTXt, iTXt and vendor chunks.</li>
-            <li><b>WebP EXIF/XMP/ICCP</b>: metadata chunks.</li>
-            <li><b>MP4 / MOV</b>: GPS, Apple and Android keys, creation dates, encoder names, unique IDs, C2PA, XMP, hidden tracks and padding.</li>
-            <li><b>WebM / MKV</b>: tags, title, dates, segment IDs, attachments, chapters, padding.</li>
-            <li><b>Inside the video stream</b>: encoder strings (x264, VideoToolbox SEI) and AV1 metadata.</li>
+            <li data-for="photo"><b>JPEG APP/COM</b>: app marker segments.</li>
+            <li data-for="photo"><b>PNG text chunks</b>: tEXt, zTXt, iTXt and vendor chunks.</li>
+            <li data-for="photo"><b>WebP EXIF/XMP/ICCP</b>: metadata chunks.</li>
+            <li data-for="video"><b>MP4 / MOV</b>: GPS, Apple and Android keys, creation dates, encoder names, unique IDs, C2PA, XMP, hidden tracks and padding.</li>
+            <li data-for="video"><b>WebM / MKV</b>: tags, title, dates, segment IDs, attachments, chapters, padding.</li>
+            <li data-for="video"><b>Inside the video stream</b>: encoder strings (x264, VideoToolbox SEI) and AV1 metadata.</li>
+          </ul>
+        </article>
+        <article data-for="link">
+          <h2>How it works</h2>
+          <ol class="how-list">
+            <li>Paste a link, or a whole message with links in it.</li>
+            <li>Each link is checked against known tracking tags and a short rule per site, right in this page.</li>
+            <li>The clean text appears as you type. Tap the summary to see what came off each link.</li>
+            <li>Copy it and share it. Nothing was sent anywhere.</li>
+          </ol>
+        </article>
+        <article data-for="link">
+          <h2>What gets removed</h2>
+          <ul class="wiki-list">
+            <li><b>Ad click IDs</b>: fbclid, gclid, msclkid, ttclid and the utm tags.</li>
+            <li><b>Share IDs</b>: who shared it, from X, Instagram, TikTok, YouTube, Spotify, LinkedIn and Reddit.</li>
+            <li><b>Shop links</b>: Amazon, eBay, AliExpress, Etsy and Temu cut down to the product.</li>
+            <li><b>Redirects</b>: Facebook, Google and YouTube wrappers replaced by the real address.</li>
+            <li><b>Highlights</b>: the text you highlighted, which some browsers add to copied links.</li>
           </ul>
         </article>
       </div>
 
       <div class="faq">
         <h2>Questions</h2>
-        <details>
+        <details data-for="photo video">
           <summary>Why does the input scan say FAIL?</summary>
           <p>That just means metadata or non-essential chunks were detected in your original file. That is exactly the stuff this tool removes. Only the <b>output</b> scan decides whether the download is allowed.</p>
         </details>
         <details>
-          <summary>Does this upload my image anywhere?</summary>
-          <p>No. All processing happens in your browser in a Web Worker. The production build ships a Content-Security-Policy that blocks every outbound connection.</p>
+          <summary>Does this upload anything?</summary>
+          <p>No. Photos, videos and links are all processed in your browser. The site ships a Content-Security-Policy that blocks every outbound connection.</p>
         </details>
-        <details>
+        <details data-for="photo video">
           <summary>Does it remove everything?</summary>
           <p>It removes known metadata and provenance structures. It cannot guarantee removal of steganography hidden inside the pixels themselves.</p>
         </details>
-        <details>
+        <details data-for="photo video">
           <summary>Why force PNG in Ultra Paranoid mode?</summary>
           <p>PNG is a simpler container with fewer metadata edge-cases, so the fail-closed checks can be stricter and more certain. For video, Ultra Paranoid always re-encodes when the browser can, removes the sound, and writes MP4.</p>
         </details>
-        <details>
+        <details data-for="video">
           <summary>Full clean or basic clean for video?</summary>
           <p><b>Full clean</b> decodes every frame and re-encodes it with your browser's own video encoder, which also drops the original encoder's fingerprint and weakens fragile hidden patterns. <b>Basic clean</b> rebuilds the container from the raw samples and strips every metadata box and in-stream tag, but leaves the picture and sound bytes as they were. You get the full clean whenever your browser has a WebCodecs encoder; otherwise the page tells you and falls back to the basic clean.</p>
         </details>
-        <details>
+        <details data-for="video">
           <summary>Why does video take longer?</summary>
           <p>A full clean re-encodes every frame. A minute of 1080p video can take from a few seconds on a desktop to a few minutes on a phone. The basic clean is a byte copy and takes seconds.</p>
         </details>
-        <details>
+        <details data-for="photo">
           <summary>Does this remove AI watermarks?</summary>
           <p>It can reduce some. Reduce hidden marks runs a small local autoencoder round trip plus a resample and requantize, which defeats fragile marks such as the DWT-DCT scheme older Stable Diffusion builds used. It does not remove SynthID or similar robust marks, it cannot verify that anything is gone, and a processed image can itself be recognised as processed.</p>
         </details>
-        <details>
+        <details data-for="link">
           <summary>How does Clean a link work?</summary>
           <p>It removes the tags that only exist to track who shared a link and who clicked it: utm and click IDs from the ad networks (fbclid, gclid, msclkid and others), share IDs from X, Instagram, TikTok, YouTube and Spotify, and referral codes from Amazon and eBay. Amazon and eBay product links are cut down to the product number. Facebook, Google and YouTube redirect links are replaced by the real address inside them. Anything it does not recognise stays, so the link keeps working. It all runs in your browser.</p>
         </details>
-        <details>
+        <details data-for="link">
           <summary>Can it open short links like t.co, bit.ly or amzn.to?</summary>
           <p>No, on purpose. A short link is just a code. Only the company behind it knows where it leads, and asking them tells them you clicked. The page marks short links so you know. To clean one, open it in a private window, copy the full address and paste that here.</p>
         </details>
-        <details>
+        <details data-for="photo">
           <summary>How does Remove marked area work?</summary>
           <p>You mark the watermark with the brush or a corner preset. A local inpainting model (MI-GAN, or LaMa for High quality) fills only the marked pixels, then the image goes through the same encode, strip and audit as any other. The models download once, after your click, are verified against a hash pinned in the source, and can be deleted from the editor.</p>
         </details>

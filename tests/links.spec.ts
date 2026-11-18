@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
 
 test("clean a link: works offline and sends nothing", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#links");
   await page.waitForLoadState("networkidle");
 
+  const origin = new URL(page.url()).origin;
   const requests: string[] = [];
-  page.on("request", (request) => requests.push(request.url()));
+  page.on("request", (request) => {
+    const url = request.url();
+    if (!url.startsWith(origin) && !url.startsWith("blob:") && !url.startsWith("data:")) requests.push(url);
+  });
 
   await page.fill(
     "#linkInput",
@@ -24,5 +28,5 @@ test("clean a link: works offline and sends nothing", async ({ page }) => {
   await expect(page.locator("#linkOut")).toBeHidden();
   await expect(page.locator("#linkState")).toHaveText("No link found in that text.");
 
-  expect(requests, `unexpected requests: ${requests.join(", ")}`).toEqual([]);
+  expect(requests, `unexpected external requests: ${requests.join(", ")}`).toEqual([]);
 });

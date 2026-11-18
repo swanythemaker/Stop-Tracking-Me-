@@ -620,3 +620,94 @@ input[type="range"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+body[data-tool="photo"] [data-for]:not([data-for~="photo"]),
+body[data-tool="video"] [data-for]:not([data-for~="video"]),
+body[data-tool="link"] [data-for]:not([data-for~="link"]) {
+  display: none !important;
+}
+
+.tools {
+  flex: 1 0 100%;
+  order: 8;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 560px;
+  margin-top: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tool-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #cdd8cf;
+  font: 650 0.98rem var(--sans);
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+.tool-tab svg {
+  flex: none;
+  width: 19px;
+  height: 19px;
+}
+.tool-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+.tool-tab[aria-selected="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+.tool-tab:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+}
+body[data-mode="working"] .hero-bar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+body[data-mode="working"] .tools {
+  order: 9;
+  max-width: none;
+  margin-top: 0;
+  padding: 3px;
+}
+body[data-mode="working"] .tool-tab {
+  min-height: 34px;
+  font-size: 0.88rem;
+}
+body[data-mode="working"] .tool-tab svg {
+  width: 16px;
+  height: 16px;
+}
+body[data-mode="working"] .hero-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+body[data-mode="working"] .tools {
+  grid-column: 1 / -1;
+}
+@media (max-width: 560px) {
+  body[data-mode="working"] .bar-reset {
+    padding: 8px;
+  }
+  body[data-mode="working"] .bar-reset span {
+    display: none;
+  }
+  .tool-tab {
+    gap: 6px;
+    font-size: 0.92rem;
+  }
+}

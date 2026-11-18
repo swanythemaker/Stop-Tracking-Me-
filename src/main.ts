@@ -26,6 +26,7 @@ import { WatermarkPanel } from "./ui/watermarkPanel";
 import { storedModelBytes } from "./sanitizer/models/loader";
 import { DetectClient } from "./sanitizer/detect/client";
 import { mountLinkPanel } from "./ui/linkPanel";
+import { ToolMenu, type Tool } from "./ui/tools";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
@@ -33,6 +34,7 @@ if (!app) {
 }
 app.innerHTML = appMarkup();
 mountLinkPanel();
+const tools = new ToolMenu((tool) => applyTool(tool));
 
 const client = new SanitizeClient();
 
@@ -308,7 +310,7 @@ async function handleFileSelection(file: File | null): Promise<void> {
   if (!file) {
     inputReport.textContent = "No file loaded.";
     inputScanCard.innerHTML = "";
-    setStatus("Select an image or video to begin.", "muted");
+    setStatus(idleStatus(), "muted");
     setInputPreview(null, null);
     capNote.hidden = true;
     fileCard.hidden = true;
@@ -347,6 +349,7 @@ async function handleFileSelection(file: File | null): Promise<void> {
 
   selectedFile = file;
   selectedKind = kind;
+  tools.select(toolFor(kind));
   selectedType = kind === "video" ? (videoTypeFor(file.type, file.name) ?? file.type) : file.type;
   if (kind === "video") ultraParanoid.checked = false;
   syncMediaUi();
@@ -578,6 +581,31 @@ function populateError(message: string): void {
   resultHeadline.classList.add("bad");
   resultHeadline.textContent = "Export blocked: nothing to download";
   setStatus(info.status, "bad");
+}
+
+const ACCEPT: Record<Exclude<Tool, "link">, string> = {
+  photo: "image/png,image/jpeg,image/webp",
+  video: "video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.m4v,.mov,.webm,.mkv",
+};
+
+function toolFor(kind: MediaKind): Tool {
+  return kind === "video" ? "video" : "photo";
+}
+
+function idleStatus(): string {
+  return tools.current === "video" ? "Select a video to begin." : "Select a photo to begin.";
+}
+
+function applyTool(tool: Tool): void {
+  if (tool !== "link") {
+    fileInput.accept = ACCEPT[tool];
+    if (selectedKind && toolFor(selectedKind) !== tool) {
+      resetToUpload();
+      return;
+    }
+    if (!selectedFile && flow.slide === 0) setStatus(idleStatus(), "muted");
+  }
+  flow.goTo(flow.slide);
 }
 
 function cancelCurrent(): void {
@@ -861,6 +889,8 @@ function releaseWakeLock(): void {
 function warmCore(): void {
   void client.warm().catch(() => {});
 }
+applyTool(tools.current);
+
 const ric: typeof window.requestIdleCallback | undefined = window.requestIdleCallback;
 if (typeof ric === "function") {
   ric(warmCore, { timeout: 2000 });

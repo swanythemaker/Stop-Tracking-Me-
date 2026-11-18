@@ -48,7 +48,7 @@ export class StepFlow {
   }
 
   private apply(focus: boolean): void {
-    document.body.dataset.mode = this.current === 0 ? "landing" : "working";
+    document.body.dataset.mode = this.current === 0 || document.body.dataset.tool === "link" ? "landing" : "working";
 
     this.slides.forEach((s, i) => {
       const active = i === this.current;

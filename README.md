@@ -2,7 +2,7 @@
 
 **Strip the tracking out of your photos, videos and links, in your browser, before you share them.**
 
-Current release: **v0.9.0**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.10.0**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 
@@ -12,6 +12,12 @@ the file. STOPTRACKINGME removes them, then **proves** the result is clean befor
 download.
 
 Everything runs locally. No uploads, no accounts, no servers. Your image never leaves the tab.
+
+The page has three tools in one menu at the top, the same on desktop and phone: **Photos**,
+**Videos** and **Links**. Each tool has its own intro, drop zone and help. The address remembers
+the tool (`#photos`, `#videos`, `#links`), so `/#links` opens the link cleaner directly. Dropping
+a video on Photos (or a photo on Videos) switches to the right tool. Switching to Links keeps a
+running file clean; switching between Photos and Videos starts over.
 
 ![STOPTRACKINGME](docs/preview.png)
 
@@ -209,7 +215,7 @@ Models load **on demand**, only when you press the feature that needs one, never
 
 ## Clean a link
 
-Paste a link, or a whole message with links in it, into **Clean a link**. The clean text appears
+Open **Links** in the top menu and paste a link, or a whole message with links in it. The clean text appears
 as you type, with a list of what came off each link and a copy button. It is plain string work in
 the page: no request, no worker, no model.
 
