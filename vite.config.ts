@@ -33,6 +33,15 @@ export default defineConfig({
   worker: {
     format: "es",
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        trackers: "trackers/index.html",
+        howItWorks: "how-it-works/index.html",
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 8888,

@@ -18,7 +18,7 @@ const TRACKING_PARAMS = new Set([
   "wickedid", "ref_src", "ref_url", "cmpid", "zanpid", "irclickid", "irgwc", "clickid",
   "ranmid", "raneaid", "ransiteid", "mibextid", "sfnsn", "wt_mc", "wt_zmc", "xtor", "spm",
   "scm", "sc_cid", "mbid", "_branch_match_id", "_branch_referrer", "$deep_link", "$3p",
-  "share_id", "rdt",
+  "share_id", "rdt", "fb_action_ids", "fb_action_types", "fb_source", "fb_ref",
 ]);
 
 const TRACKING_PREFIXES = [
@@ -87,7 +87,7 @@ const SITES: SiteRule[] = [
   { match: domain("threads.com"), keepOnly: [] },
   {
     match: (h) => domain("twitter.com")(h) || domain("x.com")(h),
-    params: ["s", "t", "a", "cn", "ref_src", "ref_url"],
+    params: ["s", "t", "a", "cn", "cxt", "ref_src", "ref_url"],
     rewrite: (u) => (/^\/[^/]+\/status\/\d+/.test(u.pathname) ? withPath(u, u.pathname) : null),
   },
   { match: domain("tiktok.com"), keepOnly: ["q"] },

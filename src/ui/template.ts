@@ -1,4 +1,5 @@
 import { ICON } from "./icons";
+import { siteFooter } from "../pages/chrome";
 
 export function appMarkup(): string {
   return `
@@ -300,6 +301,7 @@ export function appMarkup(): string {
         </details>
         <button id="linkCopy" class="primary" type="button">${ICON.check}<span>Copy clean link</span></button>
       </div>
+      <p class="links-learn">What do these tags give away? <a href="/trackers/">Every tracker explained</a> · <a href="/how-it-works/#links">How link tracking works</a></p>
     </section>
 
     <section class="panel docs">
@@ -484,11 +486,7 @@ export function appMarkup(): string {
       </div>
     </section>
 
-    <footer class="foot">
-      <span>${ICON.lock}</span>
-      <p>100% local. No servers, no accounts, no tracking. Your pixels never leave this tab.</p>
-      <span class="foot-version" title="build ${__APP_COMMIT__}">v${__APP_VERSION__}</span>
-    </footer>
+    ${siteFooter()}
   </main>
 
   <div class="drag-overlay" id="dragOverlay" aria-hidden="true">

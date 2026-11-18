@@ -2,7 +2,7 @@
 
 **Strip the tracking out of your photos, videos and links, in your browser, before you share them.**
 
-Current release: **v0.10.1**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.11.0**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 
@@ -240,6 +240,16 @@ it tells it you clicked, so the page says so and suggests opening it in a privat
 
 The rules live in `src/links/clean.ts`; `tests/unit/links.spec.ts` holds one real-shaped link per
 rule.
+
+Every removed tag is explained in plain words under the clean link (tags that mean the same thing
+are grouped), with a link to its entry on **/trackers/**: who adds it, what it gives away, an
+example, how sure we are (documented, widely reported or inferred) and sources. The entries live in
+`src/links/trackers.ts` and are built from the research in `research/link-trackers.md`. A unit test
+fails if any tag removed in the test links falls back to the generic explanation.
+
+**/how-it-works/** explains all three tools for normal people, with "For nerds" sections, plus what
+the site can't do and how to check in the browser that nothing leaves the device. Both pages are
+extra Vite entries (`trackers/index.html`, `how-it-works/index.html`) with the same top menu.
 
 ## What it can't do
 

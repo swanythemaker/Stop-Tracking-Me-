@@ -20,9 +20,10 @@ test("clean a link: works offline and sends nothing", async ({ page }) => {
   await expect(page.locator("#linkSummary")).toHaveText("Removed 4 trackers from 1 link · 1 short link can't be checked");
   await expect(page.locator("#linkReport")).toBeHidden();
   await page.click("#linkSummary");
-  await expect(page.locator("#linkReport li")).toHaveCount(2);
-  await expect(page.locator("#linkReport li").first()).toContainText("redirect through l.facebook.com");
-  await expect(page.locator("#linkReport li").nth(1)).toContainText("short link");
+  await expect(page.locator("#linkReport > li")).toHaveCount(2);
+  await expect(page.locator("#linkReport > li").first()).toContainText("Redirect wrapper");
+  await expect(page.locator("#linkReport > li").first()).toContainText("l.facebook.com");
+  await expect(page.locator("#linkReport > li").nth(1)).toContainText("short link");
 
   await page.fill("#linkInput", "just some words");
   await expect(page.locator("#linkOut")).toBeHidden();

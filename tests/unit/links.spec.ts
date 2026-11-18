@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { cleanLink, cleanText } from "../../src/links/clean";
+import { explainRemoved, findTracker, MECHANISMS, TRACKERS } from "../../src/links/explain";
 
 const cases: [string, string, string][] = [
   ["generic utm and click ids", "https://example.com/post?id=7&utm_source=fb&utm_medium=social&fbclid=IwAR0abc&gclid=x1", "https://example.com/post?id=7"],
@@ -88,4 +89,39 @@ test("a pasted address without https is cleaned too", () => {
 
 test("brackets that belong to the link stay", () => {
   expect(cleanText("https://en.wikipedia.org/wiki/Mercury_(planet)?utm_source=x").text).toBe("https://en.wikipedia.org/wiki/Mercury_(planet)");
+});
+
+test("every tag removed in the cases above has a real explanation", () => {
+  for (const [, input] of cases) {
+    const r = cleanLink(input)!;
+    const host = new URL(r.clean).hostname;
+    for (const entry of r.removed) {
+      expect(explainRemoved(entry, host).href, `${entry} on ${host}`).not.toContain("unknown-tags");
+    }
+  }
+});
+
+test("the same letters mean different things on different sites", () => {
+  expect(findTracker("a", "x.com")!.id).toBe("x-a");
+  expect(findTracker("s", "twitter.com")!.id).toBe("x-s");
+  expect(findTracker("si", "youtu.be")!.id).toBe("yt-si");
+  expect(findTracker("si", "open.spotify.com")!.id).toBe("spotify-si");
+  expect(findTracker("tag", "www.amazon.co.uk")!.id).toBe("amazon-tag");
+  expect(findTracker("utm_source", "x.com")!.id).toBe("utm");
+  expect(findTracker("brandnew", "x.com")!.id).toBe("x-other");
+  expect(findTracker("a", "example.com")).toBeNull();
+});
+
+test("tracker ids are unique and every named entry cites a source", () => {
+  const all = [...MECHANISMS, ...TRACKERS];
+  expect(new Set(all.map((t) => t.id)).size).toBe(all.length);
+  for (const t of all) {
+    if (!t.keys.includes("*") && t.id !== "unknown-tags") expect(t.sources.length, t.id).toBeGreaterThan(0);
+  }
+});
+
+test("the X link from the bug report explains both tags", () => {
+  const r = cleanLink("https://x.com/fromcodetocloud/status/2123062312617804096?a=arMamaA1lWeuSqriZFw&s=20")!;
+  const names = r.removed.map((e) => explainRemoved(e, "x.com").name);
+  expect(names).toEqual(["Share ID (new since October 2026)", "Share source"]);
 });
