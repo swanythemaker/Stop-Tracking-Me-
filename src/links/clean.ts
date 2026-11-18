@@ -85,11 +85,19 @@ const SITES: SiteRule[] = [
   { match: domain("instagram.com"), keepOnly: ["img_index"] },
   { match: domain("threads.net"), keepOnly: [] },
   { match: domain("threads.com"), keepOnly: [] },
-  { match: (h) => domain("twitter.com")(h) || domain("x.com")(h), params: ["s", "t", "cn", "ref_src", "ref_url"] },
+  {
+    match: (h) => domain("twitter.com")(h) || domain("x.com")(h),
+    params: ["s", "t", "a", "cn", "ref_src", "ref_url"],
+    rewrite: (u) => (/^\/[^/]+\/status\/\d+/.test(u.pathname) ? withPath(u, u.pathname) : null),
+  },
   { match: domain("tiktok.com"), keepOnly: ["q"] },
   {
     match: (h) => domain("youtube.com")(h) || h === "youtu.be",
     params: ["si", "feature", "pp", "source_ve_path", "embeds_referring_euri", "embeds_referring_origin", "ab_channel"],
+    rewrite: (u) =>
+      u.hostname === "youtu.be" || /^\/(watch|shorts\/|live\/)/.test(u.pathname)
+        ? keepOnlyParams(u, ["v", "t", "start", "list", "index"])
+        : null,
   },
   { match: domain("spotify.com"), keepOnly: [] },
   {
@@ -98,6 +106,7 @@ const SITES: SiteRule[] = [
       "trk", "trkinfo", "trackingid", "refid", "lipi", "midtoken", "midsig", "eid", "otptoken",
       "originalsubdomain", "original_referer", "lici", "rcm",
     ],
+    rewrite: (u) => (/^\/(posts|feed\/update|pulse)\//.test(u.pathname) ? withPath(u, u.pathname) : null),
   },
   { match: domain("reddit.com"), params: ["ref", "ref_source", "ref_campaign", "correlation_id", "post_fullname", "post_index"] },
   { match: domain("pinterest.com"), params: ["mt", "invite_code", "sender", "sfo"] },

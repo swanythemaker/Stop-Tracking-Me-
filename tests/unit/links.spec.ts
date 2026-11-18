@@ -12,6 +12,11 @@ const cases: [string, string, string][] = [
   ["facebook post", "https://www.facebook.com/permalink.php?story_fbid=123&id=456&__cft__[0]=AZW&__tn__=%2CO%2CP-R&mibextid=Nif5oz", "https://www.facebook.com/permalink.php?story_fbid=123&id=456"],
   ["instagram share", "https://www.instagram.com/p/C1abcDEF/?igsh=MWQ1ZGUxMzBkMA==&utm_source=ig_web_copy_link", "https://www.instagram.com/p/C1abcDEF/"],
   ["x share", "https://x.com/someone/status/1790000000000000000?s=46&t=AbCdEfGhIjKlMnOp", "https://x.com/someone/status/1790000000000000000"],
+  ["x share with the new a tag", "https://x.com/fromcodetocloud/status/2123062312617804096?a=arMamaA1lWeuSqriZFw&s=20", "https://x.com/fromcodetocloud/status/2123062312617804096"],
+  ["x post with a tag nobody knows yet", "https://x.com/someone/status/1790000000000000000/photo/1?zz9=abc", "https://x.com/someone/status/1790000000000000000/photo/1"],
+  ["youtube drops tags nobody knows yet", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42&newtrk=Zz1&list=PL1", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42&list=PL1"],
+  ["youtube shorts", "https://youtube.com/shorts/abcDEF12345?si=Ab12&feature=share", "https://youtube.com/shorts/abcDEF12345"],
+  ["linkedin post drops tags nobody knows yet", "https://www.linkedin.com/feed/update/urn:li:activity:7100000000000000000/?updateEntityUrn=x&newtrk=1", "https://www.linkedin.com/feed/update/urn:li:activity:7100000000000000000/"],
   ["twitter share", "https://twitter.com/someone/status/1?ref_src=twsrc%5Etfw", "https://twitter.com/someone/status/1"],
   ["tiktok share", "https://www.tiktok.com/@someone/video/7300000000000000000?is_from_webapp=1&sender_device=pc&_r=1&_t=8abc", "https://www.tiktok.com/@someone/video/7300000000000000000"],
   ["youtube keeps time and playlist", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42&list=PL1&si=Ab12Cd34&feature=shared&pp=ygU", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42&list=PL1"],
@@ -41,6 +46,11 @@ test("a clean link comes back byte for byte", () => {
   const r = cleanLink(url)!;
   expect(r.clean).toBe(url);
   expect(r.removed).toEqual([]);
+});
+
+test("x search keeps its query", () => {
+  const url = "https://x.com/search?q=privacy&src=typed_query&f=live";
+  expect(cleanLink(url)!.clean).toBe(url);
 });
 
 test("unknown parameters on unknown sites are kept", () => {

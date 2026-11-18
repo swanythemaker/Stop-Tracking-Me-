@@ -2,7 +2,7 @@
 
 **Strip the tracking out of your photos, videos and links, in your browser, before you share them.**
 
-Current release: **v0.10.0**. Versions follow strict [semantic versioning](https://semver.org)
+Current release: **v0.10.1**. Versions follow strict [semantic versioning](https://semver.org)
 (`MAJOR.MINOR.PATCH`, no suffixes). The app, the Rust core and the git tag always carry the same
 number, and the running build shows it in the page footer.
 
@@ -222,7 +222,8 @@ the page: no request, no worker, no model.
 | Rule | What happens | Examples |
 |---|---|---|
 | Known tracking tags, any site | removed | `utm_*`, `fbclid`, `gclid`, `msclkid`, `ttclid`, `twclid`, `igshid`, `mc_eid`, `_hsenc`, `srsltid` |
-| Site share tags | removed | X `s`/`t`, Instagram `igsh`, YouTube `si`/`pp`/`feature`, Spotify `si`, TikTok share query, LinkedIn `trk`/`rcm`, Reddit `share_id`, Facebook `__cft__`/`__tn__`/`mibextid` |
+| Site share tags | removed | X `s`/`t`/`a`, Instagram `igsh`, YouTube `si`/`pp`/`feature`, Spotify `si`, TikTok share query, LinkedIn `trk`/`rcm`, Reddit `share_id`, Facebook `__cft__`/`__tn__`/`mibextid` |
+| Post links | keep only what the link needs | X posts keep no tags; YouTube videos keep `v`, `t`, `list`, `index`; LinkedIn posts keep no tags. New tag names these sites invent are removed too |
 | Shop product links | cut to the product number | Amazon `/dp/<ASIN>` (drops `tag`, `/ref=`, the title), eBay `/itm/<id>` (keeps `var`), AliExpress, Etsy, Temu |
 | Redirect wrappers | replaced by the address inside | `l.facebook.com`, `l.instagram.com`, Google `/url`, YouTube `/redirect`, `out.reddit.com`, LinkedIn, VK, Steam |
 | Text fragments | removed | `#:~:text=` (what you highlighted), `#xtor=` |
